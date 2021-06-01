@@ -8,12 +8,18 @@ package album
    listing the modifications you have made.
 */
 
+// Missing sm/med/lg links above caption
+// When looking at a single image, also show thumbnails on top, with links to same size
+// redirect to first image if directory
+// 5; URL=/jdw/albums/2001/12(December)/Christmas/DSCN0138.JPG?slide_show=sm
+
 import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -72,7 +78,6 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Paths[0] should match an album id, Paths[1] should be either albums or thumbs
-	// It was albums in the perl version, but not needed here
 	tmplSource.Root = path
 	tmplSource.BasePath = paths[0]
 	tmplSource.PathInfo = paths[2]
@@ -87,18 +92,31 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	baseDir := tmplSource.Current.AlbumDir
-	albumDir := fmt.Sprintf("%s/%s", baseDir, tmplSource.PathInfo)
+	albumPathInfo := fmt.Sprintf("%s/%s", baseDir, tmplSource.PathInfo)
 
-	stat, err := os.Stat(albumDir)
+	stat, err := os.Stat(albumPathInfo)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+		filename := filepath.Base("/" + tmplSource.PathInfo)
+		// if the filename starts with 640x480_, 800x600_ or 1024x768_, set imgLink to
+		// thumbs and let the normal handler take care of it
+		if strings.HasPrefix(filename, "640x480_") || strings.HasPrefix(filename, "800x600_") || strings.HasPrefix(filename, "1024x768_") {
+			tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, tmplSource.PathInfo)
+			tmplSource.BaseFilename = filepath.Base(cleanTn(tmplSource.ActualPath))
+		} else {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 	}
-	if stat.Mode().IsRegular() {
-		http.ServeFile(w, req, albumDir)
+
+	if tmplSource.ActualPath == "" && stat.Mode().IsRegular() {
+		http.ServeFile(w, req, albumPathInfo)
 		return
 	}
 
+	albumDir := albumPathInfo
+	if tmplSource.ActualPath != "" {
+		albumDir = filepath.Dir(albumPathInfo)
+	}
 	fileInfos, err := ioutil.ReadDir(albumDir)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -162,34 +180,122 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	pathInfoPaths := strings.Split(tmplSource.PathInfo, "/")
-	tmplSource.PageTitle = beautify(pathInfoPaths[len(pathInfoPaths)-1])
-	if tmplSource.Current.NumberOfColumns > 0 {
-		tmplSource.NumberOfColumns = uint32(tmplSource.Current.NumberOfColumns)
+	tmplSource.PageTitle = beautify(filepath.Base(tmplSource.PathInfo))
+
+	tmplText := ""
+	if tmplSource.ActualPath == "" {
+		if tmplSource.Current.NumberOfColumns > 0 {
+			tmplSource.NumberOfColumns = uint32(tmplSource.Current.NumberOfColumns)
+		} else {
+			tmplSource.NumberOfColumns = tmplSource.Current.GetDefaultBrowserWidth() / tmplSource.Current.GetThumbnailWidth()
+		}
+		tmplText = `           <TR>
+		{{ range $index,$ele := .Files }}
+			{{ if $.NeedNewRow $index}}
+		</TR>
+		<TR>  
+			 {{ end}}
+		  <TD ALIGN="center">
+			<TABLE BORDER={{ $.Current.InsideTableBorder }}>
+			  <TR>
+				<TD ALIGN="center"><A HREF="{{ $ele.Name }}"><IMG SRC="/{{ $.BasePath }}/thumbs/{{ $.PathInfo }}/tn__{{ $ele.Name }}" ALT="{{ $ele.Name }}"></A></TD>
+			  </TR>
+			  <TR>
+				<TD ALIGN="center"><A HREF="640x480_{{ $ele.Name }}">Sm</A> <A HREF="800x600_{{ $ele.Name }}">Med</A> </A><A HREF="1024x768_{{ $ele.Name }}">Lg</A><BR>
+				{{ $.MakePicTitle $ele.Name }}
+				</TD>
+			  </TR>
+			</TABLE>
+		  </TD>
+		{{ end }}
+		</TR>
+`
 	} else {
-		tmplSource.NumberOfColumns = tmplSource.Current.GetDefaultBrowserWidth() / tmplSource.Current.GetThumbnailWidth()
+		for idx, fileInfo := range tmplSource.Files {
+			if fileInfo.Name() == tmplSource.BaseFilename {
+				tmplSource.FileIndex = idx
+			}
+		}
+		lastIndex := len(tmplSource.Files) - 1
+		if lastIndex > 7 {
+			if tmplSource.FileIndex > 3 {
+				less := tmplSource.FileIndex - 3
+				if less > 7 {
+					less = 7
+				}
+				move := 0
+				if tmplSource.FileIndex > lastIndex-3 {
+					move = lastIndex - tmplSource.FileIndex
+				}
+				prevName := tmplSource.Files[tmplSource.FileIndex-less-move].Name()
+				currentBase := filepath.Base(tmplSource.Root)
+				if strings.HasPrefix(currentBase, "640x480_") {
+					prevName = "640x480_" + prevName
+				} else if strings.HasPrefix(currentBase, "800x600_") {
+					prevName = "800x600_" + prevName
+				} else if strings.HasPrefix(currentBase, "1024x768_") {
+					prevName = "1024x768_" + prevName
+				}
+
+				tmplSource.PrevSeven = fmt.Sprintf(`<TD ALIGN="left"><A HREF="%s")>&lt;Prev %d&lt;</A></TD>`,
+					fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), prevName), less)
+			}
+
+			if tmplSource.FileIndex < lastIndex-3 {
+				more := lastIndex - 3 - tmplSource.FileIndex
+				if more > 7 {
+					more = 7
+				}
+				move := 0
+				if tmplSource.FileIndex < 3 {
+					move = 3
+				}
+				nextName := tmplSource.Files[tmplSource.FileIndex+more+move].Name()
+				currentBase := filepath.Base(tmplSource.Root)
+				tmplSource.NextSeven = fmt.Sprintf(`<TD ALIGN="right"><A HREF="%s">&gt;Next %d&gt;</A></TD>`,
+					fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), fixNextName(currentBase, nextName)), more)
+			}
+		}
+
+		fmt.Printf("tmplSource:%s\n", tmplSource)
+		lowerIndex := 0
+		extra := 0
+		upperIndex := lastIndex
+		if len(tmplSource.Files) > 7 {
+			if tmplSource.FileIndex > 3 {
+				lowerIndex = tmplSource.FileIndex - 3
+			} else {
+				extra = 3 - tmplSource.FileIndex
+			}
+			if lastIndex-tmplSource.FileIndex > 3 {
+				upperIndex = tmplSource.FileIndex + 3 + extra
+			} else {
+				lowerIndex -= 3 - (lastIndex - tmplSource.FileIndex)
+			}
+		}
+		currentBase := filepath.Base(tmplSource.Root)
+		thumbNailLinks := ""
+		for i := lowerIndex; i <= upperIndex; i++ {
+			filename := tmplSource.Files[i].Name()
+			tnImgSrc := fmt.Sprintf("/%s/thumbs/%s/tn__%s", tmplSource.BasePath, filepath.Dir(tmplSource.PathInfo), filename)
+			extraTd := ""
+			if i == tmplSource.FileIndex {
+				extraTd = ` bgcolor="blue"`
+			}
+
+			thumbNailLinks += fmt.Sprintf(`<TD%s><A HREF="%s"><IMG SRC="%s" height="60"></A></TD>`, extraTd, fixNextName(currentBase, filename), tnImgSrc)
+		}
+		tmplText = fmt.Sprintf(`
+		<center><TABLE BORDER="0" CELLPADDING="4" CELLSPACING="0"><TR>{{ .PrevSeven }}%s{{ .NextSeven }}</TR></TABLE>
+		<HR>
+		<CENTER><A HREF="{{ .BaseFilename }}" BORDER="0"><IMG SRC="{{ .ActualPath }}" ALT="{{ .PathInfo }}"></A>
+<HR>
+<H3>{{ $.MakePicTitle .BaseFilename}}</H3></CENTER>
+<HR>`, thumbNailLinks)
 	}
+
 	// We have files so go ahead and build a table of thumbnails
-	tmpl = template.Must(template.New("base").Parse(pictureDirHeader() +
-		`           <TR>
-			{{ range $index,$ele := .Files }}
-				{{ if $.NeedNewRow $index}}
-			</TR>
-			<TR>  
-     		    {{ end}}
-			  <TD ALIGN="center">
-			    <TABLE BORDER={{ $.Current.InsideTableBorder }}>
-			      <TR>
-				    <TD ALIGN="center"><A HREF="{{ $ele.Name }}"><IMG SRC="/{{ $.BasePath }}/thumbs/{{ $.PathInfo }}/tn__{{ $ele.Name }}" ALT="{{ $ele.Name }}"></A></TD>
-				  </TR>
-			      <TR>
-				    <TD ALIGN="center">{{ $.MakePicTitle $ele.Name }}</TD>
-				  </TR>
-			    </TABLE>
-			  </TD>
-			{{ end }}
-			</TR>
-` + pictureDirFooter()))
+	tmpl = template.Must(template.New("base").Parse(pictureDirHeader() + tmplText + pictureDirFooter()))
 }
 
 func (a Album) generateDirs() *template.Template {
@@ -392,4 +498,17 @@ func pictureDirFooter() string {
 	<address>https://github.com/jddwoody/album</address>
 </BODY>
 </HTML>`
+}
+
+func fixNextName(currentBase, nextName string) string {
+	if strings.HasPrefix(currentBase, "640x480_") {
+		return "640x480_" + nextName
+	}
+	if strings.HasPrefix(currentBase, "800x600_") {
+		return "800x600_" + nextName
+	}
+	if strings.HasPrefix(currentBase, "1024x768_") {
+		return "1024x768_" + nextName
+	}
+	return nextName
 }

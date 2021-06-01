@@ -51,6 +51,11 @@ type TemplateSource struct {
 	Files           []os.FileInfo
 	Dirs            []os.FileInfo
 	PageTitle       string
+	ActualPath      string
+	BaseFilename    string
+	FileIndex       int
+	PrevSeven       string
+	NextSeven       string
 	CaptionHtml     string
 	CaptionMap      map[string]string
 }
@@ -104,8 +109,8 @@ func (c Config) String() string {
 }
 
 func (t TemplateSource) String() string {
-	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,PageTitle:%s,CaptionHtml:%s`,
-		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.PageTitle, t.CaptionHtml)
+	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,PageTitle:%s,ActualPath:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v`,
+		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.PageTitle, t.ActualPath, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
 }
 
 func NewCaptionFile(f io.Reader) *CaptionFile {
