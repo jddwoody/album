@@ -11,7 +11,7 @@
       "ThumbNailWidth": 200,
       "ThumbNailAspect": "1/5",
       "DefaultBrowserWidth": 800,
-      "SlideShowDelay": 60,
+      "SlideShowDelay": 10,
       "OutsideTableBorder": 1,
       "EditMode": false,
       "AllowFinalResize": false,

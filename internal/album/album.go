@@ -108,6 +108,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	slideShow := req.URL.Query().Get("slide_show")
+	if slideShow != "" {
+		tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s/%s", tmplSource.BasePath, filepath.Dir(tmplSource.PathInfo), changeSize(slideShow, filepath.Base(tmplSource.PathInfo)))
+		tmplSource.BaseFilename = filepath.Base("/" + tmplSource.PathInfo)
+	}
 	if tmplSource.ActualPath == "" && stat.Mode().IsRegular() {
 		http.ServeFile(w, req, albumPathInfo)
 		return
@@ -184,6 +189,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 
 	tmplText := ""
 	if tmplSource.ActualPath == "" {
+		if slideShow != "" && len(tmplSource.Files) > 0 {
+			// If there isn't a filename and slideShow is enabled, just call the first picture
+			http.Redirect(w, req, fmt.Sprintf("%s/%s?slide_show=%s", tmplSource.Root, tmplSource.Files[0].Name(), slideShow), http.StatusTemporaryRedirect)
+			return
+		}
 		if tmplSource.Current.NumberOfColumns > 0 {
 			tmplSource.NumberOfColumns = uint32(tmplSource.Current.NumberOfColumns)
 		} else {
@@ -292,6 +302,12 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 <HR>
 <H3>{{ $.MakePicTitle .BaseFilename}}</H3></CENTER>
 <HR>`, thumbNailLinks)
+
+		// If it's a slideshow show, set up a refresh
+		if slideShow != "" && tmplSource.FileIndex < lastIndex {
+			w.Header().Set("Refresh", fmt.Sprintf("%d; URL=%s?slide_show=%s", tmplSource.Current.SlideShowDelay, tmplSource.Files[tmplSource.FileIndex+1].Name(), slideShow))
+		}
+
 	}
 
 	// We have files so go ahead and build a table of thumbnails
@@ -389,7 +405,7 @@ func (a Album) generateTopPage() *template.Template {
 func (a Album) Footer() string {
 	return `
 	<center>
-		Slide Show: <a href="?slide_show=sm">small</a> | <a href="?slide_show=med">medium</a> | <a href="?slide_show=lg">large</a> | <a href="?slide_show=xlg">xlarge</a> | <a href="?slide_show=full">full sized</a>
+		Slide Show: <a href="?slide_show=sm">small</a> | <a href="?slide_show=med">medium</a> | <a href="?slide_show=lg">large</a> | <a href="?slide_show=full">full sized</a>
 	</center>
 	<br>
 	<center>
@@ -489,7 +505,7 @@ func pictureDirFooter() string {
 	</TABLE>
 	</CENTER>
 	<HR>
-	<CENTER>Slide Show: <a href="?slide_show=sm">small</a> | <a href="?slide_show=med">medium</a> | <a href="?slide_show=lg\>large</a> | <a href="?slide_show=full\>full sized</a><br>
+	<CENTER>Slide Show: <a href="?slide_show=sm">small</a> | <a href="?slide_show=med">medium</a> | <a href="?slide_show=lg">large</a> | <a href="?slide_show=full">full sized</a><br>
 			All Images: <a href="?all_full_images=sm">small</a> | <a href="?all_full_images=med">medium</a> | <a href="?all_full_images=lg">large</a> | <a href="?all_full_images=full">full sized</a><br>
 			<a href="./">Back to thumbnails</a><br>
 			<a href="/{{ .BasePath }}/albums/">Back to {{ .Current.AlbumTitle }}</a>
@@ -511,4 +527,17 @@ func fixNextName(currentBase, nextName string) string {
 		return "1024x768_" + nextName
 	}
 	return nextName
+}
+
+func changeSize(name, filename string) string {
+	switch name {
+	case "sm":
+		return "640x480_" + filename
+	case "med":
+		return "800x600_" + filename
+	case "lg":
+		return "1024x768_" + filename
+	}
+
+	return filename
 }
