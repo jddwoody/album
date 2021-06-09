@@ -109,7 +109,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 
 	slideShow := req.URL.Query().Get("slide_show")
-	if slideShow != "" {
+	if slideShow != "" && stat.Mode().IsRegular() {
 		tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s/%s", tmplSource.BasePath, filepath.Dir(tmplSource.PathInfo), changeSize(slideShow, filepath.Base(tmplSource.PathInfo)))
 		tmplSource.BaseFilename = filepath.Base("/" + tmplSource.PathInfo)
 	}
@@ -188,6 +188,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	tmplSource.PageTitle = beautify(filepath.Base(tmplSource.PathInfo))
 
 	tmplText := ""
+	fmt.Printf("ActualPath:%s, slideshow:%s, len(files):%d\n", tmplSource.ActualPath, slideShow, len(tmplSource.Files))
 	if tmplSource.ActualPath == "" {
 		if slideShow != "" && len(tmplSource.Files) > 0 {
 			// If there isn't a filename and slideShow is enabled, just call the first picture
