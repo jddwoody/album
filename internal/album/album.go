@@ -21,6 +21,7 @@ import (
 	"text/template"
 
 	"github.com/disintegration/imaging"
+	"gopkg.in/yaml.v2"
 )
 
 func (a Album) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -145,6 +146,23 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				if err == nil {
 					defer in.Close()
 					captionFile = NewCaptionFile(in)
+				}
+			} else if fileInfo.Name() == "config.yaml" {
+				in, err := os.Open(fmt.Sprintf("%s/%s", albumDir, fileInfo.Name()))
+				if err == nil {
+					defer in.Close()
+					decoder := yaml.NewDecoder(in)
+					var dirConfig Config
+					err = decoder.Decode(&dirConfig)
+					if err == nil {
+						fmt.Printf("Merging %s\n", dirConfig)
+						Merge(&tmplSource.Current, &dirConfig)
+						fmt.Printf("After merge %s\n", tmplSource.Current)
+					} else {
+						fmt.Printf("Error decoding config file: %v\n", err)
+					}
+				} else {
+					fmt.Printf("Error opening config file: %v\n", err)
 				}
 			} else {
 				tmplSource.Files = append(tmplSource.Files, fileInfo)
@@ -499,7 +517,7 @@ func pictureDirHeader() string {
 	return `
 	<HTML>
 		<HEADER><TITLE>{{ .PageTitle }}</TITLE></HEADER>
-		<BODY {{ .App.BodyArgs }}>
+		<BODY {{ .Current.BodyArgs }}>
 		<CENTER>
 		  {{ .CaptionHtml }}
 		  <TABLE BORDER={{ .Current.OutsideTableBorder }}>	`
