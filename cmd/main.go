@@ -9,28 +9,29 @@ package main
 */
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/jddwoody/album/internal/album"
+	"gopkg.in/yaml.v2"
 )
 
 func main() {
-	configFilename := "config.json"
+	configFilename := "config.yaml"
 	in, err := os.Open(configFilename)
-	// if we os.Open returns an error then handle it
 	if err != nil {
 		log.Fatal(fmt.Sprintf("Could not open %s: %v", configFilename, err))
 	}
 
 	defer in.Close()
-	bytes, _ := ioutil.ReadAll(in)
+	decoder := yaml.NewDecoder(in)
 	var app album.App
-	json.Unmarshal(bytes, &app)
+	err = decoder.Decode(&app)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("Error parsing %s: %v", configFilename, err))
+	}
 
 	album := album.Album{App: app}
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", app.Port), album))

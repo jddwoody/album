@@ -8,11 +8,6 @@ package album
    listing the modifications you have made.
 */
 
-// Missing sm/med/lg links above caption
-// When looking at a single image, also show thumbnails on top, with links to same size
-// redirect to first image if directory
-// 5; URL=/jdw/albums/2001/12(December)/Christmas/DSCN0138.JPG?slide_show=sm
-
 import (
 	"fmt"
 	"io/ioutil"
@@ -45,8 +40,23 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 
 	paths := strings.SplitN(path[1:], "/", 3)
 	if len(paths) < 3 {
-		// It should always be at least 2, so generate an error
-		w.WriteHeader(http.StatusNotFound)
+		// It should always be at least 2, so show page with available albums
+		tmpl = template.Must(template.New("base").Parse(`<HTML>
+  <HEADER><TITLE>Available Albums</TITLE></HEADER>
+  <BODY {{ .BodyArgs }}>
+    <H3>Available Albums</H3>
+	{{ range .SortedAlbumTitles }}
+	<a href="/{{ .Key }}/albums/">{{ .Title }}</a><br>
+	{{ end }}
+	<BR><HR>
+	<address>https://github.com/jddwoody/album</address>
+  </BODY>
+</HTML>
+`))
+
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		tmpl.Execute(w, a.App)
 		return
 	}
 
@@ -72,11 +82,6 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		tmpl.Execute(w, tmplSource)
 	}()
 
-	if path == "/" {
-		tmpl = a.generateTopPage()
-		return
-	}
-
 	// Paths[0] should match an album id, Paths[1] should be either albums or thumbs
 	tmplSource.Root = path
 	tmplSource.BasePath = paths[0]
@@ -86,11 +91,13 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 	fmt.Printf("0:%s, 1:%s, leftovers:'%s'\n", paths[0], paths[1], tmplSource.PathInfo)
 	var ok bool
-	tmplSource.Current, ok = a.App.Albums[paths[0]]
+	tmplSource.Current = a.App.Default
+	dirConfig, ok := a.App.Albums[paths[0]]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	Merge(&tmplSource.Current, &dirConfig)
 	baseDir := tmplSource.Current.AlbumDir
 	albumPathInfo := fmt.Sprintf("%s/%s", baseDir, tmplSource.PathInfo)
 
@@ -196,7 +203,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		if tmplSource.Current.NumberOfColumns > 0 {
-			tmplSource.NumberOfColumns = uint32(tmplSource.Current.NumberOfColumns)
+			tmplSource.NumberOfColumns = tmplSource.Current.NumberOfColumns
 		} else {
 			tmplSource.NumberOfColumns = tmplSource.Current.GetDefaultBrowserWidth() / tmplSource.Current.GetThumbnailWidth()
 		}
@@ -387,22 +394,6 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, albumNa
 	http.ServeFile(w, req, fullFilename)
 }
 
-func (a Album) generateTopPage() *template.Template {
-	return template.Must(template.New("base").Parse(`
-	<HTML>
-		<HEADER><TITLE>Available Albums</TITLE></HEADER>
-		<BODY {{ .App.BodyArgs }}>
-			<H3>Available Albums</H3>
-			{{ range $key, $value := .App.Albums }}
-			  <a href="/{{ $key }}/albums/">{{ $value.AlbumTitle }}</a><br>
-			{{ end }}
-			<BR><HR>
-			<address>https://github.com/jddwoody/album</address>
-		</BODY>
-	</HTML>
-	`))
-}
-
 func (a Album) Footer() string {
 	return `
 	<center>
@@ -415,9 +406,22 @@ func (a Album) Footer() string {
 `
 }
 
+func (a App) SortedAlbumTitles() []AlbumTitle {
+	titles := make([]AlbumTitle, 0)
+	for key, value := range a.Albums {
+		titles = append(titles, AlbumTitle{
+			Key:   key,
+			Title: value.AlbumTitle,
+		})
+	}
+
+	sort.Slice(titles, func(i, j int) bool { return titles[i].Title < titles[j].Title })
+	return titles
+}
+
 func (t TemplateSource) NeedNewRow(index int) bool {
-	fmt.Printf("index:%d,need:%t\n", index, index > 0 && uint32(index)%t.NumberOfColumns == 0)
-	return index > 0 && uint32(index)%t.NumberOfColumns == 0
+	fmt.Printf("index:%d,need:%t\n", index, index > 0 && index%t.NumberOfColumns == 0)
+	return index > 0 && index%t.NumberOfColumns == 0
 }
 
 func (t TemplateSource) HandleDirs(f os.FileInfo, subdir string, depth int) string {

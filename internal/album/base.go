@@ -17,28 +17,29 @@ import (
 )
 
 type App struct {
-	Port     uint32
-	BodyArgs string
-	Albums   map[string]Config
+	Port     int               `yaml:"port"`
+	BodyArgs string            `yaml:"bodyArgs"`
+	Default  Config            `yaml:"default"`
+	Albums   map[string]Config `yaml:"albums"`
 }
 
 type Config struct {
-	AlbumTitle          string
-	AlbumDir            string
-	BodyArgs            string
-	ThumbNailUse        string
-	ThumbNailWidth      uint32
-	ThumbNailAspect     string
-	ThumbDir            string
-	DefaultBrowserWidth uint32
-	SlideShowDelay      uint32
-	NumberOfColumns     uint8
-	OutsideTableBorder  uint8
-	InsideTableBorder   uint8
-	EditMode            bool
-	AllowFinalResize    bool
-	ReverseDirs         bool
-	ReversePics         bool
+	AlbumTitle          string `yaml:"albumTitle"`
+	AlbumDir            string `yaml:"albumDir"`
+	BodyArgs            string `yaml:"bodyArgs"`
+	ThumbNailUse        string `yaml:"thumbNailUse"`
+	ThumbNailWidth      int    `yaml:"thumbNailWidth"`
+	ThumbNailAspect     string `yaml:"thumbNailAspect"`
+	ThumbDir            string `yaml:"thumbDir"`
+	DefaultBrowserWidth int    `yaml:"defaultBrowserWidth"`
+	SlideShowDelay      int    `yaml:"slideShowDelay"`
+	NumberOfColumns     int    `yaml:"numberOfColumns"`
+	OutsideTableBorder  int    `yaml:"outsideTableBorder"`
+	InsideTableBorder   int    `yaml:"insideTableBorder"`
+	EditMode            bool   `yaml:"editMode"`
+	AllowFinalResize    bool   `yaml:"allowFinalResize"`
+	ReverseDirs         bool   `yaml:"reverseDirs"`
+	ReversePics         bool   `yaml:"reversePics"`
 }
 
 type TemplateSource struct {
@@ -47,7 +48,7 @@ type TemplateSource struct {
 	Root            string
 	BasePath        string
 	PathInfo        string
-	NumberOfColumns uint32
+	NumberOfColumns int
 	Files           []os.FileInfo
 	Dirs            []os.FileInfo
 	PageTitle       string
@@ -69,6 +70,11 @@ type Album struct {
 	App App
 }
 
+type AlbumTitle struct {
+	Key   string
+	Title string
+}
+
 var (
 	prefixMap = map[string]string{
 		"sm":  "640x480_",
@@ -88,14 +94,14 @@ func (c Config) GetThumbnailUse() string {
 	return c.ThumbNailUse
 }
 
-func (c Config) GetThumbnailWidth() uint32 {
+func (c Config) GetThumbnailWidth() int {
 	if c.ThumbNailWidth == 0 {
 		return 100
 	}
 	return c.ThumbNailWidth
 }
 
-func (c Config) GetDefaultBrowserWidth() uint32 {
+func (c Config) GetDefaultBrowserWidth() int {
 	if c.DefaultBrowserWidth == 0 {
 		return 640
 	}
@@ -111,6 +117,10 @@ func (c Config) String() string {
 func (t TemplateSource) String() string {
 	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,PageTitle:%s,ActualPath:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v`,
 		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.PageTitle, t.ActualPath, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
+}
+
+func (a AlbumTitle) String() string {
+	return fmt.Sprintf(`AlbumTitle:{Key%s, Title:%s`, a.Key, a.Title)
 }
 
 func NewCaptionFile(f io.Reader) *CaptionFile {
@@ -132,5 +142,58 @@ func NewCaptionFile(f io.Reader) *CaptionFile {
 	return &CaptionFile{
 		Html:       html,
 		CaptionMap: captionMap,
+	}
+}
+
+// merges any non-default values in b into a
+func Merge(a, b *Config) {
+	if b.AlbumTitle != "" {
+		a.AlbumTitle = b.AlbumTitle
+	}
+	if b.AlbumDir != "" {
+		a.AlbumDir = b.AlbumDir
+	}
+
+	if b.BodyArgs != "" {
+		a.BodyArgs = b.BodyArgs
+	}
+
+	if b.ThumbNailUse != "" {
+		a.ThumbNailUse = b.ThumbNailUse
+	}
+
+	if b.ThumbNailWidth > 0 {
+		a.ThumbNailWidth = b.ThumbNailWidth
+	}
+
+	if b.ThumbNailAspect != "" {
+		a.ThumbNailAspect = b.ThumbNailAspect
+	}
+
+	if b.ThumbDir != "" {
+		a.ThumbDir = b.ThumbDir
+	}
+
+	if b.SlideShowDelay > 0 {
+		a.SlideShowDelay = b.SlideShowDelay
+	}
+
+	if b.NumberOfColumns > 0 {
+		a.NumberOfColumns = b.NumberOfColumns
+	}
+
+	if b.EditMode {
+		a.EditMode = true
+	}
+
+	if b.AllowFinalResize {
+		a.AllowFinalResize = true
+	}
+	if b.ReverseDirs {
+		a.ReverseDirs = true
+	}
+
+	if b.ReversePics {
+		a.ReversePics = true
 	}
 }

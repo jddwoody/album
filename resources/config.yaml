@@ -1,0 +1,19 @@
+port: 8000
+bodyArgs: bgcolor="#003939" rgb="#000000" text="#FFFFFF" link="#00ff00" vlink="#83BCBC"
+default:
+    bodyArgs: bgcolor="#003939" rgb="#000000" text="#FFFFFF" link="#00ff00" vlink="#83BCBC"
+    thumbNailUse: width
+    thumbNailWidth: 200
+    thumbNailAspect: 1/5
+    defaultBrowserWidth: 800
+    slideShowDelay: 10
+    outsideTableBorder: 1
+    editMode: false
+    allowFinalResize: false
+    reverseDirs: false
+    reversePics: false
+albums:
+  test:
+    albumTitle: Test Album
+    albumDir: "/tools/albums/albums_loc"
+    thumbDir: "/tools/albums/thumbs"
