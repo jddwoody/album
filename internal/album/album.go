@@ -155,9 +155,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 					var dirConfig Config
 					err = decoder.Decode(&dirConfig)
 					if err == nil {
-						fmt.Printf("Merging %s\n", dirConfig)
 						Merge(&tmplSource.Current, &dirConfig)
-						fmt.Printf("After merge %s\n", tmplSource.Current)
 					} else {
 						fmt.Printf("Error decoding config file: %v\n", err)
 					}
@@ -438,7 +436,6 @@ func (a App) SortedAlbumTitles() []AlbumTitle {
 }
 
 func (t TemplateSource) NeedNewRow(index int) bool {
-	fmt.Printf("index:%d,need:%t\n", index, index > 0 && index%t.NumberOfColumns == 0)
 	return index > 0 && index%t.NumberOfColumns == 0
 }
 
