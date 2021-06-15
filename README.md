@@ -52,7 +52,6 @@ default:
     defaultBrowserWidth: 800
     slideShowDelay: 10
     outsideTableBorder: 1
-    editMode: false
     allowFinalResize: false
     reverseDirs: false
     reversePics: false
@@ -61,24 +60,49 @@ albums:
     albumTitle: Test Album
     albumDir: "/tools/albums/albums_loc"
     thumbDir: "/tools/albums/thumbs"
+    thumbNailWidth: 250
+    slideShowDelay: 20
+
 ```
+
+### Server Properties
++ `port` *default:* `8000`: Port to bind server to
++ `bodyArgs`: Attributes for the body tag on the page, mostly used to set color scheme
++ `default`: Default set of Album Properties, unless overridden in the albums section these values will be used
+
+### Album Properties
+
++ `albumTitle`: The name to display for the album
++ `albumDir`: Full base directory where all images for the album are stored
++ `thumbDir`: Writable directory where thumbnails will be cached
++ `thumbNailUse`: *default:* `width`: Can either be set to "width" or "aspect"
+<br/>If set to "width", thumbnails that need to be created will be thumbNailWidth wide, and the height will be modified to keep the same aspect as the original image.
+<br/>If set to "aspect", thumbnails that need to be created will be transformed by the value of `thumbNailAspect'which  can be either a floating point number like 0.25 or it can be a ratio like 2 / 11.
+<br/>If an image file is updated, the corresponding thumbnail file will be updated the next time the page is accessed.
++ `defaultBrowserWidth`:  A general number of how wide you want the final table to be, not an absolute number. If the next image would take it past this "invisible line", a new row is started.
++ `numberOfColumns`: *default:* `0`: Instead of using defaultBrowserWidth and a guess at the number of pixels, numberOfColumns can be set to the maximum number of columns in a table. The default is 0 (which causes DefaultBrowserWidth to be used instead).
+
 ### Directory Structure
 
 Generally directories are sorted and have the same beautify as the caption files, ie a directory called Christmas_Party will have a link with the text "Christmas Party". An exception is that directories in the form:
 
+```
 .
-+--01(January)
-|  +--New_Years_Party
-+--02(February)
-|  +--Valetines_Day
+├── 2020
+│   ├── (01)January
+│   │   ├── New_Years_Party
+│   ├── (02)February
+│   │   ├── Valetines_Day
+```
 
 Will sort by the intial numbers, but will only display "January" and "February"
 
 ```
-January
-    New Years Party
-February
-    Valentines Day
+2020
+    January
+        New Years Party
+    February
+        Valentines Day
 ```
 
 ### caption.txt
@@ -89,11 +113,13 @@ The caption.txt file consists of two parts. The first part is text/html that wil
 
 For example:
 
-|Filename|Bob_and_Jenny.jpg|
-|Default Caption|Bob and Jenny|
+|Filename|Default Caption|
+|--------|---------------|
+|Bob_and_Jenny.jpg|Bob and Jenny|
 
-caption.txt:
+You can change the default caption by creating a caption.txt file and putting in the following:
 ```
+__END__
 Bob_and_Jenny.jpg: This is me with my sister <EM>Jenny</EM>.
 ```
 
