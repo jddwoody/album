@@ -23,13 +23,15 @@ type App struct {
 	Albums   map[string]Config `yaml:"albums"`
 }
 
+// Implement aspect ratio
+
 type Config struct {
 	AlbumTitle          string `yaml:"albumTitle"`
 	AlbumDir            string `yaml:"albumDir"`
 	BodyArgs            string `yaml:"bodyArgs"`
-	ThumbNailUse        string `yaml:"thumbNailUse"`
-	ThumbNailWidth      int    `yaml:"thumbNailWidth"`
-	ThumbNailAspect     string `yaml:"thumbNailAspect"`
+	ThumbnailUse        string `yaml:"thumbnailUse"`
+	ThumbnailWidth      int    `yaml:"thumbnailWidth"`
+	ThumbnailAspect     string `yaml:"thumbnailAspect"`
 	ThumbDir            string `yaml:"thumbDir"`
 	DefaultBrowserWidth int    `yaml:"defaultBrowserWidth"`
 	SlideShowDelay      int    `yaml:"slideShowDelay"`
@@ -84,21 +86,21 @@ var (
 )
 
 func (a App) String() string {
-	return fmt.Sprintf(`App:{Port:%d,BodyArgs:%s,Albums:%v`, a.Port, a.BodyArgs, a.Albums)
+	return fmt.Sprintf(`App:{Port:%d,BodyArgs:%s,Default:%s,Albums:%v`, a.Port, a.BodyArgs, a.Default, a.Albums)
 }
 
 func (c Config) GetThumbnailUse() string {
-	if c.ThumbNailUse == "" {
+	if c.ThumbnailUse == "" {
 		return "width"
 	}
-	return c.ThumbNailUse
+	return c.ThumbnailUse
 }
 
 func (c Config) GetThumbnailWidth() int {
-	if c.ThumbNailWidth == 0 {
+	if c.ThumbnailWidth == 0 {
 		return 100
 	}
-	return c.ThumbNailWidth
+	return c.ThumbnailWidth
 }
 
 func (c Config) GetDefaultBrowserWidth() int {
@@ -109,8 +111,8 @@ func (c Config) GetDefaultBrowserWidth() int {
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf(`Config:{AlbumTitle:"%s",AlbumDir:"%s",BodyArgs:%s,ThumbNailUse:"%s",ThumbNailWidth:%d,ThumbNailAspect:"%s",ThumbDir:"%s",SlideShowDelay:%d,NumberOfColumns:%d,EditMode:%v,AllowFinalResize:%v,ReverseDirs:%v,ReversePics:%v`,
-		c.AlbumTitle, c.AlbumDir, c.BodyArgs, c.ThumbNailUse, c.ThumbNailWidth, c.ThumbNailAspect, c.ThumbDir,
+	return fmt.Sprintf(`Config:{AlbumTitle:"%s",AlbumDir:"%s",BodyArgs:%s,ThumbnailUse:"%s",ThumbnailWidth:%d,ThumbnailAspect:"%s",ThumbDir:"%s",SlideShowDelay:%d,NumberOfColumns:%d,EditMode:%v,AllowFinalResize:%v,ReverseDirs:%v,ReversePics:%v`,
+		c.AlbumTitle, c.AlbumDir, c.BodyArgs, c.ThumbnailUse, c.ThumbnailWidth, c.ThumbnailAspect, c.ThumbDir,
 		c.SlideShowDelay, c.NumberOfColumns, c.EditMode, c.AllowFinalResize, c.ReverseDirs, c.ReversePics)
 }
 
@@ -158,16 +160,16 @@ func Merge(a, b *Config) {
 		a.BodyArgs = b.BodyArgs
 	}
 
-	if b.ThumbNailUse != "" {
-		a.ThumbNailUse = b.ThumbNailUse
+	if b.ThumbnailUse != "" {
+		a.ThumbnailUse = b.ThumbnailUse
 	}
 
-	if b.ThumbNailWidth > 0 {
-		a.ThumbNailWidth = b.ThumbNailWidth
+	if b.ThumbnailWidth > 0 {
+		a.ThumbnailWidth = b.ThumbnailWidth
 	}
 
-	if b.ThumbNailAspect != "" {
-		a.ThumbNailAspect = b.ThumbNailAspect
+	if b.ThumbnailAspect != "" {
+		a.ThumbnailAspect = b.ThumbnailAspect
 	}
 
 	if b.ThumbDir != "" {

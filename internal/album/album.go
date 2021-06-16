@@ -93,12 +93,12 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	fmt.Printf("0:%s, 1:%s, leftovers:'%s'\n", paths[0], paths[1], tmplSource.PathInfo)
 	var ok bool
 	tmplSource.Current = a.App.Default
-	dirConfig, ok := a.App.Albums[paths[0]]
+	albumConfig, ok := a.App.Albums[paths[0]]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	Merge(&tmplSource.Current, &dirConfig)
+	Merge(&tmplSource.Current, &albumConfig)
 	baseDir := tmplSource.Current.AlbumDir
 	albumPathInfo := fmt.Sprintf("%s/%s", baseDir, tmplSource.PathInfo)
 
@@ -308,7 +308,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		currentBase := filepath.Base(tmplSource.Root)
-		thumbNailLinks := ""
+		thumbnailLinks := ""
 		for i := lowerIndex; i <= upperIndex; i++ {
 			filename := tmplSource.Files[i].Name()
 			tnImgSrc := fmt.Sprintf("/%s/thumbs/%s/tn__%s", tmplSource.BasePath, filepath.Dir(tmplSource.PathInfo), filename)
@@ -317,7 +317,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				extraTd = ` bgcolor="blue"`
 			}
 
-			thumbNailLinks += fmt.Sprintf(`<TD%s><A HREF="%s"><IMG SRC="%s" height="60"></A></TD>`, extraTd, fixNextName(currentBase, filename), tnImgSrc)
+			thumbnailLinks += fmt.Sprintf(`<TD%s><A HREF="%s"><IMG SRC="%s" height="60"></A></TD>`, extraTd, fixNextName(currentBase, filename), tnImgSrc)
 		}
 		tmplText = fmt.Sprintf(`
 		<center><TABLE BORDER="0" CELLPADDING="4" CELLSPACING="0"><TR>{{ .PrevSeven }}%s{{ .NextSeven }}</TR></TABLE>
@@ -325,7 +325,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		<CENTER><A HREF="{{ .BaseFilename }}" BORDER="0"><IMG SRC="{{ .ActualPath }}" ALT="{{ .PathInfo }}"></A>
 <HR>
 <H3>{{ $.MakePicTitle .BaseFilename}}</H3></CENTER>
-<HR>`, thumbNailLinks)
+<HR>`, thumbnailLinks)
 
 		// If it's a slideshow show, set up a refresh
 		if slideShow != "" && tmplSource.FileIndex < lastIndex {
@@ -358,12 +358,14 @@ func (a Album) generateDirs() *template.Template {
 }
 
 func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, albumName, pathInfo string) {
-	config, ok := a.App.Albums[albumName]
+	config := a.App.Default
+	albumConfig, ok := a.App.Albums[albumName]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
+	Merge(&config, &albumConfig)
 	thumbDir := config.ThumbDir
 	fullFilename := fmt.Sprintf("%s/%s", thumbDir, pathInfo)
 	_, err := os.Stat(fullFilename)
@@ -395,7 +397,7 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, albumNa
 		}
 
 		filename := path.Base(pathInfo)
-		width := int(config.ThumbNailWidth)
+		width := int(config.ThumbnailWidth)
 		if strings.HasPrefix(filename, "640") {
 			width = 640
 		} else if strings.HasPrefix(filename, "800") {
