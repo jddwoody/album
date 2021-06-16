@@ -163,7 +163,9 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 					fmt.Printf("Error opening config file: %v\n", err)
 				}
 			} else {
-				tmplSource.Files = append(tmplSource.Files, fileInfo)
+				if !strings.HasPrefix(fileInfo.Name(), ".") {
+					tmplSource.Files = append(tmplSource.Files, fileInfo)
+				}
 			}
 		}
 	}
