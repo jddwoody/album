@@ -12,27 +12,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/jddwoody/album/internal/album"
-	"gopkg.in/yaml.v2"
 )
 
 func main() {
-	configFilename := "config.yaml"
-	in, err := os.Open(configFilename)
+	app, err := album.LoadConfigFile()
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Could not open %s: %v", configFilename, err))
+		log.Fatal(fmt.Sprintf("Error loading config file %s, err:%v", album.CONFIG_FILENAME, err))
 	}
-
-	defer in.Close()
-	decoder := yaml.NewDecoder(in)
-	var app album.App
-	err = decoder.Decode(&app)
-	if err != nil {
-		log.Fatal(fmt.Sprintf("Error parsing %s: %v", configFilename, err))
-	}
-
-	album := album.Album{App: app}
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", app.Port), album))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", app.Port), album.Album{}))
 }

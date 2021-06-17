@@ -29,7 +29,6 @@ func (a Album) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case "GET":
 		a.handleGet(w, req)
 	}
-
 }
 
 func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
@@ -37,7 +36,12 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	path := url.Path
 	fmt.Printf("url.Path:%s\n", url.Path)
 	var tmpl *template.Template
-	tmplSource := TemplateSource{App: a.App}
+	app, err := LoadConfigFile()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	tmplSource := TemplateSource{App: app}
 
 	paths := strings.SplitN(path[1:], "/", 3)
 	if len(paths) < 3 {
@@ -57,13 +61,13 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
-		tmpl.Execute(w, a.App)
+		tmpl.Execute(w, app)
 		return
 	}
 
 	if paths[1] == "thumbs" {
 		// must be a thumbnail, files only
-		a.handleThumbnail(w, req, paths[0], paths[2])
+		a.handleThumbnail(w, req, app, paths[0], paths[2])
 		return
 	}
 
@@ -92,8 +96,8 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 	fmt.Printf("0:%s, 1:%s, leftovers:'%s'\n", paths[0], paths[1], tmplSource.PathInfo)
 	var ok bool
-	tmplSource.Current = a.App.Default
-	albumConfig, ok := a.App.Albums[paths[0]]
+	tmplSource.Current = app.Default
+	albumConfig, ok := app.Albums[paths[0]]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -139,7 +143,9 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	var captionFile *CaptionFile
 	for _, fileInfo := range fileInfos {
 		if fileInfo.IsDir() {
-			tmplSource.Dirs = append(tmplSource.Dirs, fileInfo)
+			if !strings.HasPrefix(fileInfo.Name(), ".") {
+				tmplSource.Dirs = append(tmplSource.Dirs, fileInfo)
+			}
 		} else {
 			if fileInfo.Name() == "caption.txt" {
 				in, err := os.Open(fmt.Sprintf("%s/%s", albumDir, fileInfo.Name()))
@@ -359,9 +365,9 @@ func (a Album) generateDirs() *template.Template {
 	`))
 }
 
-func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, albumName, pathInfo string) {
-	config := a.App.Default
-	albumConfig, ok := a.App.Albums[albumName]
+func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, app *App, albumName, pathInfo string) {
+	config := app.Default
+	albumConfig, ok := app.Albums[albumName]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -574,4 +580,26 @@ func changeSize(name, filename string) string {
 	}
 
 	return filename
+}
+
+func LoadConfigFile() (*App, error) {
+	in, err := os.Open(CONFIG_FILENAME)
+	if err != nil {
+		return nil, err
+	}
+
+	defer in.Close()
+	decoder := yaml.NewDecoder(in)
+	var app App
+	err = decoder.Decode(&app)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := os.Stat(CONFIG_FILENAME)
+	if err == nil {
+		app.Timestamp = file.ModTime()
+	}
+
+	return &app, nil
 }

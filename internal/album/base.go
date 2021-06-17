@@ -15,17 +15,20 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
-	DEFAULT_ASPECT = 0.2
+	DEFAULT_ASPECT  = 0.2
+	CONFIG_FILENAME = "config.yaml"
 )
 
 type App struct {
-	Port     int               `yaml:"port"`
-	BodyArgs string            `yaml:"bodyArgs"`
-	Default  Config            `yaml:"default"`
-	Albums   map[string]Config `yaml:"albums"`
+	Port      int               `yaml:"port"`
+	BodyArgs  string            `yaml:"bodyArgs"`
+	Default   Config            `yaml:"default"`
+	Albums    map[string]Config `yaml:"albums"`
+	Timestamp time.Time         `yaml:"timestamp"`
 }
 
 // Implement aspect ratio
@@ -50,7 +53,7 @@ type Config struct {
 }
 
 type TemplateSource struct {
-	App             App
+	App             *App
 	Current         Config
 	Root            string
 	BasePath        string
@@ -74,7 +77,6 @@ type CaptionFile struct {
 }
 
 type Album struct {
-	App App
 }
 
 type AlbumTitle struct {
@@ -91,7 +93,7 @@ var (
 )
 
 func (a App) String() string {
-	return fmt.Sprintf(`App:{Port:%d,BodyArgs:%s,Default:%s,Albums:%v`, a.Port, a.BodyArgs, a.Default, a.Albums)
+	return fmt.Sprintf(`App:{Port:%d,BodyArgs:%s,Default:%s,Albums:%v,Timestamp:%v`, a.Port, a.BodyArgs, a.Default, a.Albums, a.Timestamp)
 }
 
 func (c Config) GetThumbnailUse() string {
