@@ -399,7 +399,7 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, albumNa
 		}
 
 		filename := path.Base(pathInfo)
-		width := int(config.ThumbnailWidth)
+		width := int(config.GetThumbnailWidth())
 		if strings.HasPrefix(filename, "640") {
 			width = 640
 		} else if strings.HasPrefix(filename, "800") {
@@ -463,6 +463,16 @@ func (t TemplateSource) HandleDirs(f os.FileInfo, subdir string, depth int) stri
 	fmt.Printf("Checking dir %s\n", dir)
 	fileInfos, err := ioutil.ReadDir(dir)
 	if err == nil {
+		if t.Current.ReverseDirs {
+			sort.Slice(fileInfos, func(i, j int) bool {
+				return fileInfos[i].Name() > fileInfos[j].Name()
+			})
+		} else {
+			sort.Slice(fileInfos, func(i, j int) bool {
+				return fileInfos[i].Name() < fileInfos[j].Name()
+			})
+		}
+
 		for _, fileInfo := range fileInfos {
 			if fileInfo.IsDir() {
 				children += t.HandleDirs(fileInfo, newSubDir, depth+1)

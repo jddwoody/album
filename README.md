@@ -79,7 +79,7 @@ albums:
 <br/>If set to "width", thumbnails that need to be created will be thumbnailWidth wide, and the height will be modified to keep the same aspect as the original image.
 <br/>If set to "aspect", thumbnails that need to be created will be transformed by the value of `thumbnailAspect'which  can be either a floating point number like 0.25 or it can be a ratio like 2 / 11.
 <br/>If an image file is updated, the corresponding thumbnail file will be updated the next time the page is accessed.
-+ `defaultBrowserWidth`:  A general number of how wide you want the final table to be, not an absolute number. If the next image would take it past this "invisible line", a new row is started.
++ `defaultBrowserWidth`:  *default*: `640`: A general number of how wide you want the final table to be, not an absolute number. If the next image would take it past this "invisible line", a new row is started.
 + `numberOfColumns`: *default:* `0`: Instead of using defaultBrowserWidth and a guess at the number of pixels, numberOfColumns can be set to the maximum number of columns in a table. The default is 0 (which causes DefaultBrowserWidth to be used instead).
 
 ### Directory Structure

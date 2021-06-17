@@ -13,7 +13,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+)
+
+const (
+	DEFAULT_ASPECT = 0.2
 )
 
 type App struct {
@@ -108,6 +113,35 @@ func (c Config) GetDefaultBrowserWidth() int {
 		return 640
 	}
 	return c.DefaultBrowserWidth
+}
+
+func (c Config) GetThumbnailAspect() float64 {
+	if c.ThumbnailAspect == "" {
+		return DEFAULT_ASPECT
+	}
+
+	aspect, err := strconv.ParseFloat(strings.TrimSpace(c.ThumbnailAspect), 64)
+	if err == nil {
+		return aspect
+	}
+
+	// If it's not already a float see if it's a simple division
+	split := strings.Split(c.ThumbnailAspect, "/")
+	if len(split) != 2 {
+		return DEFAULT_ASPECT
+	}
+
+	num, err := strconv.ParseFloat(strings.TrimSpace(split[0]), 64)
+	if err != nil {
+		fmt.Printf("Could not parse:'%s', err:%v\n", split[0], err)
+		return DEFAULT_ASPECT
+	}
+	den, err := strconv.ParseFloat(strings.TrimSpace(split[1]), 64)
+	if err != nil {
+		fmt.Printf("Could not parse:'%s', err:%v\n", split[1], err)
+		return DEFAULT_ASPECT
+	}
+	return num / den
 }
 
 func (c Config) String() string {
