@@ -5,7 +5,7 @@ default:
     thumbnailUse: width
     thumbnailWidth: 200
     thumbnailAspect: 1/5
-    defaultBrowserWidth: 800
+    defaultBrowserWidth: 1024
     slideShowDelay: 10
     outsideTableBorder: 1
     editMode: false

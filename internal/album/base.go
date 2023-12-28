@@ -13,9 +13,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alitto/pond"
 )
 
 const (
@@ -59,8 +63,8 @@ type TemplateSource struct {
 	BasePath        string
 	PathInfo        string
 	NumberOfColumns int
-	Files           []os.FileInfo
-	Dirs            []os.FileInfo
+	Files           []os.DirEntry
+	Dirs            []os.DirEntry
 	PageTitle       string
 	ActualPath      string
 	BaseFilename    string
@@ -90,7 +94,75 @@ var (
 		"med": "800x600_",
 		"lg":  "1024x768_",
 	}
+
+	filetypeMap = map[string][]string{
+		"images":   {"jpg", "jpeg", "gif"},
+		"videos":   {"avi", "mpeg", "mov"},
+		"htmlview": {"ogg", "webm", "mp4"},
+	}
+
+	pool = pond.New(5, 750)
+
+	workingMap = make(map[string]bool)
 )
+
+func IsViewableFile(filename string) bool {
+	return IsImageFile(filename) || IsVideoFile(filename)
+}
+
+func IsImageFile(filename string) bool {
+	asLower := strings.ToLower(filename)
+	for _, filetype := range filetypeMap["images"] {
+		if strings.HasSuffix(asLower, filetype) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsVideoFile(filename string) bool {
+	asLower := strings.ToLower(filename)
+	for _, filetype := range filetypeMap["htmlview"] {
+		if strings.HasSuffix(asLower, filetype) {
+			return true
+		}
+	}
+	for _, filetype := range filetypeMap["videos"] {
+		if strings.HasSuffix(asLower, filetype) {
+			return true
+		}
+	}
+	return false
+}
+
+func CanHtmlPlay(filename string) bool {
+	asLower := strings.ToLower(filename)
+	for _, filetype := range filetypeMap["htmlview"] {
+		if strings.HasSuffix(asLower, filetype) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsFfmpegAvailable() bool {
+	_, err := exec.LookPath("ffmpeg")
+	return err == nil
+}
+
+func GenerateVideoThumbnail(inFilename, size, outFilename string) error {
+	cmd := exec.Command("ffmpeg", "-i", inFilename, "-frames:v", "1", "-s", size, outFilename)
+	return cmd.Run()
+}
+
+func ConvertVideoFile(inFilename, outFilename string) error {
+	cmd := exec.Command("ffmpeg", "-i", inFilename, outFilename)
+	return cmd.Run()
+}
+
+func ChangeExtension(filename, ext string) string {
+	return fmt.Sprintf("%s.%s", strings.TrimSuffix(filename, filepath.Ext(filename)), ext)
+}
 
 func (a App) String() string {
 	return fmt.Sprintf(`App:{Port:%d,BodyArgs:%s,Default:%s,Albums:%v,Timestamp:%v`, a.Port, a.BodyArgs, a.Default, a.Albums, a.Timestamp)
