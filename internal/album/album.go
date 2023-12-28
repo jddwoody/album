@@ -274,7 +274,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 					tmplSource.Files = append(tmplSource.Files, dirEntry)
 
 					// A video file that isn't html viewable needs to be converted
-					if IsVideoFile(dirEntry.Name()) {
+					if VideoNeedsConversion(dirEntry.Name()) {
 						originalFilename := fmt.Sprintf("%s/%s", albumDir, dirEntry.Name())
 						thumbActualDir := fmt.Sprintf("%s/%s", tmplSource.Current.ThumbDir, tmplSource.PathInfo)
 						convertedFilename := fmt.Sprintf("%s/%s", thumbActualDir, ChangeExtension(dirEntry.Name(), "webm"))
