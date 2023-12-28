@@ -34,7 +34,7 @@ func (a Album) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	url := req.URL
 	path := url.Path
-	fmt.Printf("url.Path:%s\n", url.Path)
+	fmt.Printf("url.Path:%s\n", path)
 	var tmpl *template.Template
 	app, err := LoadConfigFile()
 	if err != nil {

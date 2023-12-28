@@ -121,12 +121,11 @@ func IsImageFile(filename string) bool {
 }
 
 func IsVideoFile(filename string) bool {
+	return CanHtmlPlay(filename) || VideoNeedsConversion(filename)
+}
+
+func VideoNeedsConversion(filename string) bool {
 	asLower := strings.ToLower(filename)
-	for _, filetype := range filetypeMap["htmlview"] {
-		if strings.HasSuffix(asLower, filetype) {
-			return true
-		}
-	}
 	for _, filetype := range filetypeMap["videos"] {
 		if strings.HasSuffix(asLower, filetype) {
 			return true
