@@ -546,7 +546,7 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, app *Ap
 			// Must be video, need to figure out the original filename and save a frame
 			clean := cleanTn(pathInfo)
 			prefix := strings.TrimSuffix(clean, filepath.Ext(clean))
-			glob, err := filepath.Glob(fmt.Sprintf("%s%s", prefix, "*"))
+			glob, err := filepath.Glob(fmt.Sprintf("%s/%s*", config.AlbumDir, prefix))
 			if err != nil {
 				fmt.Printf("Glob error using %s, err: %s\n", prefix, err)
 				w.WriteHeader(http.StatusInternalServerError)
