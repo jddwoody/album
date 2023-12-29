@@ -53,8 +53,6 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	{{ range .SortedAlbumTitles }}
 	<a href="/{{ .Key }}/albums/">{{ .Title }}</a><br>
 	{{ end }}
-	<BR><HR>
-	<address>https://github.com/jddwoody/album</address>
   </BODY>
 </HTML>
 `))
@@ -204,7 +202,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		} else {
 			tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, ChangeExtension(tmplSource.PathInfo, "webm"))
 		}
-		tmpl = template.Must(template.New("base").Parse(pictureDirHeader() + fmt.Sprintf(
+		tmpl = template.Must(template.New("base").Parse(pictureDirHeader(false) + fmt.Sprintf(
 			`            <center><TABLE BORDER="0" CELLPADDING="4" CELLSPACING="0"><TR>{{ .PrevSeven }}%s{{ .NextSeven }}</TR></TABLE>
 		<HR>
             <TR>
@@ -319,7 +317,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			root = "thumbs"
 			prefix = prefixMap[allFullImages]
 		}
-		tmpl = template.Must(template.New("base").Parse(pictureDirHeader() +
+		tmpl = template.Must(template.New("base").Parse(pictureDirHeader(true) +
 			`           <TR>
 			{{ range $index,$ele := .Files }}
 			<CENTER><IMG SRC="/{{ $.BasePath }}/` + root + `/{{ $.PathInfo }}/` + prefix + `{{ $ele.Name }}" ALT="{{ $ele.Name }}"></CENTER><HR>
@@ -331,6 +329,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 
 	tmplSource.PageTitle = beautify(filepath.Base(tmplSource.PathInfo))
+	if filepath.Dir(tmplSource.PathInfo) != "" {
+		tmplSource.FullTitle = strings.Join(strings.Split(filepath.Dir(tmplSource.PathInfo), "/"), " - ") + " - " + tmplSource.PageTitle
+	} else {
+		tmplSource.FullTitle = tmplSource.PageTitle
+	}
 
 	tmplText := ""
 	fmt.Printf("ActualPath:%s, slideshow:%s, len(files):%d\n", tmplSource.ActualPath, slideShow, len(tmplSource.Files))
@@ -465,7 +468,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// We have files so go ahead and build a table of thumbnails
-	tmpl = template.Must(template.New("base").Parse(pictureDirHeader() + tmplText + pictureDirFooter()))
+	tmpl = template.Must(template.New("base").Parse(pictureDirHeader(true) + tmplText + pictureDirFooter()))
 }
 
 func (a Album) generateDirs() *template.Template {
@@ -480,8 +483,6 @@ func (a Album) generateDirs() *template.Template {
 			  {{ $.HandleDirs . "" 0}}
 			</dl>
 			{{ end }}
-			<BR><HR>
-			<address>https://github.com/jddwoody/album</address>
 		</BODY>
 	</HTML>
 	`))
@@ -554,7 +555,7 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, app *Ap
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			err = GenerateVideoThumbnail(glob[0], "200x150", fullFilename)
+			err = GenerateVideoThumbnail(glob[0], config.GetVideoThumbnailSize(), fullFilename)
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -683,28 +684,35 @@ func cleanTn(filename string) string {
 	return filename
 }
 
-func pictureDirHeader() string {
+func pictureDirHeader(includeExtraTitle bool) string {
+	extraTitle := ""
+	height := "125"
+	if includeExtraTitle {
+		extraTitle = `<CENTER>{{ .Current.AlbumTitle }} - {{ .FullTitle }}</CENTER>`
+		height = "150"
+	}
 	return `
 	<HTML>
 		<HEADER><TITLE>{{ .PageTitle }}</TITLE></HEADER>
-		<BODY {{ .Current.BodyArgs }}>
+		<BODY {{ .Current.BodyArgs }}>` + extraTitle +
+		`<HR />
 		<CENTER>
+		  <div style="overflow: auto; height: calc(100vh - ` + height + `px)">
 		  {{ .CaptionHtml }}
 		  <TABLE BORDER={{ .Current.OutsideTableBorder }}>	`
 }
 
 func pictureDirFooter() string {
 	return `
-	</TABLE>
+	  </div>
+	  </TABLE>
 	</CENTER>
 	<HR>
 	<CENTER>Slide Show: <a href="?slide_show=sm">small</a> | <a href="?slide_show=med">medium</a> | <a href="?slide_show=lg">large</a> | <a href="?slide_show=full">full sized</a><br>
 			All Images: <a href="?all_full_images=sm">small</a> | <a href="?all_full_images=med">medium</a> | <a href="?all_full_images=lg">large</a> | <a href="?all_full_images=full">full sized</a><br>
 			<a href="./">Back to thumbnails</a><br>
 			<a href="/{{ .BasePath }}/albums/">Back to {{ .Current.AlbumTitle }}</a>
-	</CENTER><BR>
-	<HR>
-	<address>https://github.com/jddwoody/album</address>
+	</CENTER>
 </BODY>
 </HTML>`
 }

@@ -41,6 +41,7 @@ type Config struct {
 	AlbumTitle          string `yaml:"albumTitle"`
 	AlbumDir            string `yaml:"albumDir"`
 	BodyArgs            string `yaml:"bodyArgs"`
+	VideoThumbnailSize  string `yaml:"videoThumbnailSize"`
 	ThumbnailUse        string `yaml:"thumbnailUse"`
 	ThumbnailWidth      int    `yaml:"thumbnailWidth"`
 	ThumbnailAspect     string `yaml:"thumbnailAspect"`
@@ -65,6 +66,7 @@ type TemplateSource struct {
 	NumberOfColumns int
 	Files           []os.DirEntry
 	Dirs            []os.DirEntry
+	FullTitle       string
 	PageTitle       string
 	ActualPath      string
 	BaseFilename    string
@@ -101,7 +103,7 @@ var (
 		"htmlview": {"ogg", "webm", "mp4"},
 	}
 
-	pool = pond.New(5, 750)
+	pool = pond.New(3, 750)
 
 	workingMap = make(map[string]bool)
 )
@@ -181,6 +183,13 @@ func (c Config) GetThumbnailWidth() int {
 	return c.ThumbnailWidth
 }
 
+func (c Config) GetVideoThumbnailSize() string {
+	if c.VideoThumbnailSize == "" {
+		return "200x150"
+	}
+	return c.VideoThumbnailSize
+}
+
 func (c Config) GetDefaultBrowserWidth() int {
 	if c.DefaultBrowserWidth == 0 {
 		return 640
@@ -218,14 +227,14 @@ func (c Config) GetThumbnailAspect() float64 {
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf(`Config:{AlbumTitle:"%s",AlbumDir:"%s",BodyArgs:%s,ThumbnailUse:"%s",ThumbnailWidth:%d,ThumbnailAspect:"%s",ThumbDir:"%s",SlideShowDelay:%d,NumberOfColumns:%d,EditMode:%v,AllowFinalResize:%v,ReverseDirs:%v,ReversePics:%v`,
-		c.AlbumTitle, c.AlbumDir, c.BodyArgs, c.ThumbnailUse, c.ThumbnailWidth, c.ThumbnailAspect, c.ThumbDir,
+	return fmt.Sprintf(`Config:{AlbumTitle:"%s",AlbumDir:"%s",BodyArgs:%s,VideoThumbnailSize:"%s",ThumbnailUse:"%s",ThumbnailWidth:%d,ThumbnailAspect:"%s",ThumbDir:"%s",SlideShowDelay:%d,NumberOfColumns:%d,EditMode:%v,AllowFinalResize:%v,ReverseDirs:%v,ReversePics:%v`,
+		c.AlbumTitle, c.AlbumDir, c.BodyArgs, c.ThumbnailUse, c.VideoThumbnailSize, c.ThumbnailWidth, c.ThumbnailAspect, c.ThumbDir,
 		c.SlideShowDelay, c.NumberOfColumns, c.EditMode, c.AllowFinalResize, c.ReverseDirs, c.ReversePics)
 }
 
 func (t TemplateSource) String() string {
-	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,PageTitle:%s,ActualPath:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v`,
-		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.PageTitle, t.ActualPath, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
+	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,FullTitle:%s, PageTitle:%s,ActualPath:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v`,
+		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.FullTitle, t.PageTitle, t.ActualPath, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
 }
 
 func (a AlbumTitle) String() string {
@@ -265,6 +274,10 @@ func Merge(a, b *Config) {
 
 	if b.BodyArgs != "" {
 		a.BodyArgs = b.BodyArgs
+	}
+
+	if b.VideoThumbnailSize != "" {
+		a.VideoThumbnailSize = b.VideoThumbnailSize
 	}
 
 	if b.ThumbnailUse != "" {
