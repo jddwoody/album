@@ -92,7 +92,6 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	tmplSource.BasePath = paths[0]
 	tmplSource.PathInfo = paths[2]
 	tmplSource.PathInfo = strings.TrimSuffix(tmplSource.PathInfo, "/")
-	fmt.Printf("0:%s, 1:%s, leftovers:'%s'\n", paths[0], paths[1], tmplSource.PathInfo)
 	var ok bool
 	tmplSource.Current = app.Default
 	albumConfig, ok := app.Albums[paths[0]]
@@ -122,8 +121,6 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	if playVideo != "" && stat.Mode().IsRegular() {
 		tmplSource.BaseFilename = filepath.Base(tmplSource.PathInfo)
 		videoDir := fmt.Sprintf("%s/%s", baseDir, filepath.Dir(tmplSource.PathInfo))
-		fmt.Printf("tmplSource:%s\n", tmplSource)
-		fmt.Printf("baseFilename:%s videoDir:%s\n", tmplSource.BaseFilename, videoDir)
 		dirEntries, err := os.ReadDir(videoDir)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -142,7 +139,6 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		lastIndex := len(tmplSource.Files) - 1
-		fmt.Printf("FileIndex:%d lastIndex:%d\n", tmplSource.FileIndex, lastIndex)
 
 		if lastIndex > 7 {
 			if tmplSource.FileIndex > 3 {
