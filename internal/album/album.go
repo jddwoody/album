@@ -558,7 +558,7 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, app *Ap
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			fmt.Printf("glob:%v\n", glob)
+			fmt.Printf("fullFilename:%v\n", fullFilename)
 			err = GenerateVideoThumbnail(glob[0], "200x150", fullFilename)
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
