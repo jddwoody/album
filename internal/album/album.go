@@ -371,7 +371,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				<TD ALIGN="center"><A HREF="{{ $ele.Name }}?playvideo=1"><IMG SRC="/{{ $.BasePath }}/thumbs/{{ $.PathInfo }}/tn__{{ $.AsPngFilename $ele.Name }}" ALT="{{ $.AsPngFilename $ele.Name }}"></A></TD>
 			  </TR>
 			  <TR>
-				{{ $.MakePicTitle $ele.Name }}
+				<TD ALIGN="center">{{ $.MakePicTitle $ele.Name }}</TD>
 			  </TR>
 		    {{ end }}
 			</TABLE>
