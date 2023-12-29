@@ -547,7 +547,6 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, app *Ap
 			clean := cleanTn(pathInfo)
 			prefix := strings.TrimSuffix(clean, filepath.Ext(clean))
 			sourceGlob := fmt.Sprintf("%s/%s*", config.AlbumDir, prefix)
-			fmt.Printf("sourceGlob:%s\n", sourceGlob)
 			glob, err := filepath.Glob(sourceGlob)
 			if err != nil {
 				fmt.Printf("Glob error using %s, err: %s\n", prefix, err)
@@ -559,6 +558,7 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, app *Ap
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
+			fmt.Printf("glob:%v\n", glob)
 			err = GenerateVideoThumbnail(glob[0], "200x150", fullFilename)
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
