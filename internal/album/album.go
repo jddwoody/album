@@ -330,7 +330,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 
 	tmplSource.PageTitle = beautify(filepath.Base(tmplSource.PathInfo))
 	if filepath.Dir(tmplSource.PathInfo) != "" {
-		tmplSource.FullTitle = strings.Join(strings.Split(filepath.Dir(tmplSource.PathInfo), "/"), " - ") + " - " + tmplSource.PageTitle
+		paths := strings.Split(filepath.Dir(tmplSource.PathInfo), "/")
+		for idx, ele := range paths {
+			paths[idx] = beautify(ele)
+		}
+		tmplSource.FullTitle = strings.Join(paths, " - ") + " - " + tmplSource.PageTitle
 	} else {
 		tmplSource.FullTitle = tmplSource.PageTitle
 	}
