@@ -194,7 +194,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				extraTd = ` bgcolor="blue"`
 			}
 
-			thumbnailLinks += fmt.Sprintf(`<TD%s><A HREF="%s?playvideo=1"><IMG SRC="%s" height="60"></A></TD>`, extraTd, fixNextName(currentBase, filename), tnImgSrc)
+			thumbnailLinks += fmt.Sprintf(`<TD%s><A HREF="%s?playvideo=1"><IMG SRC="%s" height="60" title="Click to Play Video"></A></TD>`, extraTd, fixNextName(currentBase, filename), tnImgSrc)
 		}
 
 		if CanHtmlPlay(tmplSource.BaseFilename) {
@@ -278,7 +278,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 								workingMap[originalFilename] = true
 								pool.Submit(func() {
 									ConvertVideoFile(originalFilename, convertedFilename)
-									delete(workingMap, originalFilename)
+									//delete(workingMap, originalFilename)
 								})
 							}
 						}
@@ -371,7 +371,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			  </TR>
 			{{ else }}
 			  <TR>
-				<TD ALIGN="center"><A HREF="{{ $ele.Name }}?playvideo=1"><IMG SRC="/{{ $.BasePath }}/thumbs/{{ $.PathInfo }}/tn__{{ $.AsPngFilename $ele.Name }}" ALT="{{ $.AsPngFilename $ele.Name }}"></A></TD>
+				<TD ALIGN="center"><A HREF="{{ $ele.Name }}?playvideo=1"><IMG SRC="/{{ $.BasePath }}/thumbs/{{ $.PathInfo }}/tn__{{ $.AsPngFilename $ele.Name }}" ALT="{{ $.AsPngFilename $ele.Name }}" title="Click to Play Video"></A></TD>
 			  </TR>
 			  <TR>
 				<TD ALIGN="center">{{ $.MakePicTitle $ele.Name }}</TD>
