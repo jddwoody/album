@@ -108,6 +108,16 @@ var (
 	workingMap = make(map[string]bool)
 )
 
+func GetImageFiles(files []os.DirEntry) []os.DirEntry {
+	var imageFiles []os.DirEntry
+	for _, file := range files {
+		if IsImageFile(file.Name()) {
+			imageFiles = append(imageFiles, file)
+		}
+	}
+	return imageFiles
+}
+
 func IsViewableFile(filename string) bool {
 	return IsImageFile(filename) || IsVideoFile(filename)
 }

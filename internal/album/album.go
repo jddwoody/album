@@ -217,8 +217,14 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 
 	slideShow := req.URL.Query().Get("slide_show")
 	if slideShow != "" && stat.Mode().IsRegular() {
-		tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s/%s", tmplSource.BasePath, filepath.Dir(tmplSource.PathInfo), changeSize(slideShow, filepath.Base(tmplSource.PathInfo)))
-		tmplSource.BaseFilename = filepath.Base("/" + tmplSource.PathInfo)
+		if IsImageFile(tmplSource.PathInfo) {
+			tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s/%s", tmplSource.BasePath, filepath.Dir(tmplSource.PathInfo), changeSize(slideShow, filepath.Base(tmplSource.PathInfo)))
+			tmplSource.BaseFilename = filepath.Base("/" + tmplSource.PathInfo)
+		} else {
+			// Can't do a slide show of videos
+			http.Error(w, "Can't do slide show of videos", http.StatusNotFound)
+			return
+		}
 	}
 	if tmplSource.ActualPath == "" && stat.Mode().IsRegular() {
 		http.ServeFile(w, req, albumPathInfo)
@@ -329,8 +335,9 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 
 	tmplSource.PageTitle = beautify(filepath.Base(tmplSource.PathInfo))
-	if filepath.Dir(tmplSource.PathInfo) != "" {
-		paths := strings.Split(filepath.Dir(tmplSource.PathInfo), "/")
+	dir := filepath.Dir(tmplSource.PathInfo)
+	if dir != "" && dir != "." {
+		paths := strings.Split(dir, "/")
 		for idx, ele := range paths {
 			paths[idx] = beautify(ele)
 		}
@@ -341,8 +348,9 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 
 	tmplText := ""
 	fmt.Printf("ActualPath:%s, slideshow:%s, len(files):%d\n", tmplSource.ActualPath, slideShow, len(tmplSource.Files))
+	imageFiles := GetImageFiles(tmplSource.Files)
 	if tmplSource.ActualPath == "" {
-		if slideShow != "" && len(tmplSource.Files) > 0 {
+		if slideShow != "" && len(imageFiles) > 0 {
 			// If there isn't a filename and slideShow is enabled, just call the first picture
 			http.Redirect(w, req, fmt.Sprintf("%s/%s?slide_show=%s", tmplSource.Root, tmplSource.Files[0].Name(), slideShow), http.StatusTemporaryRedirect)
 			return
@@ -383,12 +391,12 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		</TR>
 `
 	} else {
-		for idx, dirEntry := range tmplSource.Files {
+		for idx, dirEntry := range imageFiles {
 			if dirEntry.Name() == tmplSource.BaseFilename {
 				tmplSource.FileIndex = idx
 			}
 		}
-		lastIndex := len(tmplSource.Files) - 1
+		lastIndex := len(imageFiles) - 1
 		if lastIndex > 7 {
 			if tmplSource.FileIndex > 3 {
 				less := tmplSource.FileIndex - 3
@@ -399,7 +407,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				if tmplSource.FileIndex > lastIndex-3 {
 					move = lastIndex - tmplSource.FileIndex
 				}
-				prevName := tmplSource.Files[tmplSource.FileIndex-less-move].Name()
+				prevName := imageFiles[tmplSource.FileIndex-less-move].Name()
 				currentBase := filepath.Base(tmplSource.Root)
 				if strings.HasPrefix(currentBase, "640x480_") {
 					prevName = "640x480_" + prevName
@@ -422,7 +430,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				if tmplSource.FileIndex < 3 {
 					move = 3
 				}
-				nextName := tmplSource.Files[tmplSource.FileIndex+more+move].Name()
+				nextName := imageFiles[tmplSource.FileIndex+more+move].Name()
 				currentBase := filepath.Base(tmplSource.Root)
 				tmplSource.NextSeven = fmt.Sprintf(`<TD ALIGN="right"><A HREF="%s">&gt;Next %d&gt;</A></TD>`,
 					fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), fixNextName(currentBase, nextName)), more)
@@ -432,7 +440,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		lowerIndex := 0
 		extra := 0
 		upperIndex := lastIndex
-		if len(tmplSource.Files) > 7 {
+		if len(imageFiles) > 7 {
 			if tmplSource.FileIndex > 3 {
 				lowerIndex = tmplSource.FileIndex - 3
 			} else {
@@ -447,7 +455,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		currentBase := filepath.Base(tmplSource.Root)
 		thumbnailLinks := ""
 		for i := lowerIndex; i <= upperIndex; i++ {
-			filename := tmplSource.Files[i].Name()
+			filename := imageFiles[i].Name()
 			tnImgSrc := fmt.Sprintf("/%s/thumbs/%s/tn__%s", tmplSource.BasePath, filepath.Dir(tmplSource.PathInfo), filename)
 			extraTd := ""
 			if i == tmplSource.FileIndex {
@@ -466,7 +474,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 
 		// If it's a slideshow show, set up a refresh
 		if slideShow != "" && tmplSource.FileIndex < lastIndex {
-			w.Header().Set("Refresh", fmt.Sprintf("%d; URL=%s?slide_show=%s", tmplSource.Current.SlideShowDelay, tmplSource.Files[tmplSource.FileIndex+1].Name(), slideShow))
+			w.Header().Set("Refresh", fmt.Sprintf("%d; URL=%s?slide_show=%s", tmplSource.Current.SlideShowDelay, imageFiles[tmplSource.FileIndex+1].Name(), slideShow))
 		}
 
 	}
@@ -526,7 +534,7 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, app *Ap
 		}
 
 		if IsImageFile(pathInfo) {
-			img, err := imaging.Open(fmt.Sprintf("%s/%s", config.AlbumDir, cleanTn(pathInfo)))
+			img, err := imaging.Open(fmt.Sprintf("%s/%s", config.AlbumDir, cleanTn(pathInfo)), imaging.AutoOrientation(true))
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
 				return
