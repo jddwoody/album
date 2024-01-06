@@ -69,6 +69,7 @@ type TemplateSource struct {
 	FullTitle       string
 	PageTitle       string
 	ActualPath      string
+	Mp4Path         string
 	BaseFilename    string
 	FileIndex       int
 	PrevSeven       string
@@ -243,8 +244,8 @@ func (c Config) String() string {
 }
 
 func (t TemplateSource) String() string {
-	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,FullTitle:%s, PageTitle:%s,ActualPath:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v`,
-		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.FullTitle, t.PageTitle, t.ActualPath, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
+	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,FullTitle:%s, PageTitle:%s,ActualPath:%s,Mp4Path:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v`,
+		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.FullTitle, t.PageTitle, t.ActualPath, t.Mp4Path, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
 }
 
 func (a AlbumTitle) String() string {

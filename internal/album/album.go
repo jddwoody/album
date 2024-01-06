@@ -201,13 +201,23 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			tmplSource.ActualPath = tmplSource.Root
 		} else {
 			tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, ChangeExtension(tmplSource.PathInfo, "webm"))
+			tmplSource.Mp4Path = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, ChangeExtension(tmplSource.PathInfo, "mp4"))
+			mp4ActualFile := fmt.Sprintf("%s/%s", tmplSource.Current.ThumbDir, ChangeExtension(tmplSource.PathInfo, "mp4"))
+			fmt.Printf("mp4ActualFile:%s\n", mp4ActualFile)
+			if _, err := os.Stat(mp4ActualFile); errors.Is(err, os.ErrNotExist) {
+				fmt.Printf("Need to generate mp4:%s\n", mp4ActualFile)
+				ConvertVideoFile(fmt.Sprintf("%s/%s", tmplSource.Current.AlbumDir, tmplSource.PathInfo), mp4ActualFile)
+			}
 		}
 		tmpl = template.Must(template.New("base").Parse(pictureDirHeader(false) + fmt.Sprintf(
 			`            <center><TABLE BORDER="0" CELLPADDING="4" CELLSPACING="0"><TR>{{ .PrevSeven }}%s{{ .NextSeven }}</TR></TABLE>
 		<HR>
             <TR>
 			<CENTER>
-			  <video src="{{ $.ActualPath }}" controls />
+			  <video controls>
+			    <source src="{{ $.ActualPath }}" />
+			    <source src="{{ $.Mp4Path }}" />
+			  </video>
 			</CENTER>
 			<CENTER>{{ $.MakePicTitle $.BaseFilename }}</CENTER><HR>
 			</TR>
