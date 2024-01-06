@@ -341,7 +341,12 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		for idx, ele := range paths {
 			paths[idx] = beautify(ele)
 		}
-		tmplSource.FullTitle = strings.Join(paths, " - ") + " - " + tmplSource.PageTitle
+		if tmplSource.ActualPath == "" {
+			// Must be dir
+			tmplSource.FullTitle = strings.Join(paths, " - ") + " - " + tmplSource.PageTitle
+		} else {
+			tmplSource.FullTitle = strings.Join(paths, " - ")
+		}
 	} else {
 		tmplSource.FullTitle = tmplSource.PageTitle
 	}
