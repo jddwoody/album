@@ -100,8 +100,8 @@ var (
 
 	filetypeMap = map[string][]string{
 		"images":   {"jpg", "jpeg", "gif"},
-		"videos":   {"avi", "mpeg", "mov"},
-		"htmlview": {"ogg", "webm", "mp4"},
+		"videos":   {"avi", "mpeg"},
+		"htmlview": {"ogg", "webm", "mp4", "mov"},
 	}
 
 	pool = pond.New(3, 750)
