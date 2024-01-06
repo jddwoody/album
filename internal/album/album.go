@@ -214,7 +214,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		<HR>
             <TR>
 			<CENTER>
-			  <video controls>
+			  <video style="max-width: 1024px" controls>
 			    <source src="{{ $.ActualPath }}" />
 			    <source src="{{ $.Mp4Path }}" />
 			  </video>
