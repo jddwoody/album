@@ -90,6 +90,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	tmplSource.BasePath = paths[0]
 	tmplSource.PathInfo = paths[2]
 	tmplSource.PathInfo = strings.TrimSuffix(tmplSource.PathInfo, "/")
+	if IsViewableFile(tmplSource.PathInfo) {
+		tmplSource.DirInfo = filepath.Dir(tmplSource.Root)
+	} else {
+		tmplSource.DirInfo = tmplSource.Root
+	}
 	var ok bool
 	tmplSource.Current = app.Default
 	albumConfig, ok := app.Albums[paths[0]]
@@ -333,9 +338,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			root = "thumbs"
 			prefix = prefixMap[allFullImages]
 		}
+		tmplSource.PageTitle = strings.ReplaceAll(beautify(tmplSource.PathInfo), "/", " - ")
+		tmplSource.FullTitle = tmplSource.PageTitle
 		tmpl = template.Must(template.New("base").Parse(pictureDirHeader(true) +
 			`           <TR>
-			{{ range $index,$ele := .Files }}
+			{{ range $index,$ele := .GetImageFiles }}
 			<CENTER><IMG SRC="/{{ $.BasePath }}/` + root + `/{{ $.PathInfo }}/` + prefix + `{{ $ele.Name }}" ALT="{{ $ele.Name }}"></CENTER><HR>
 			<CENTER>{{ $.MakePicTitle $ele.Name }}</CENTER><HR>
 			{{ end }}
@@ -626,6 +633,10 @@ func (t TemplateSource) IsImageFile(filename string) bool {
 	return IsImageFile(filename)
 }
 
+func (t TemplateSource) GetImageFiles() []os.DirEntry {
+	return GetImageFiles(t.Files)
+}
+
 func (t TemplateSource) AsPngFilename(filename string) string {
 	return ChangeExtension(filename, "png")
 }
@@ -736,7 +747,7 @@ func pictureDirFooter() string {
 	</CENTER>
 	<HR>
 	<CENTER>Slide Show: <a href="?slide_show=sm">small</a> | <a href="?slide_show=med">medium</a> | <a href="?slide_show=lg">large</a> | <a href="?slide_show=full">full sized</a><br>
-			All Images: <a href="?all_full_images=sm">small</a> | <a href="?all_full_images=med">medium</a> | <a href="?all_full_images=lg">large</a> | <a href="?all_full_images=full">full sized</a><br>
+			All Images: <a href="{{ .DirInfo }}?all_full_images=sm">small</a> | <a href="{{ .DirInfo }}?all_full_images=med">medium</a> | <a href="{{ .DirInfo }}?all_full_images=lg">large</a> | <a href="{{ .DirInfo }}?all_full_images=full">full sized</a><br>
 			<a href="./">Back to thumbnails</a><br>
 			<a href="/{{ .BasePath }}/albums/">Back to {{ .Current.AlbumTitle }}</a>
 	</CENTER>
