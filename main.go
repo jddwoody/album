@@ -21,9 +21,9 @@ func main() {
 		fmt.Println("ffmpeg is not available, no video support")
 	}
 
-	app, err := album.LoadConfigFile()
+	app, err := album.LoadAppConfigFile()
 	if err != nil {
-		log.Fatalf("Error loading config file %s, err:%v", album.CONFIG_FILENAME, err)
+		log.Fatalf("Error loading config file %s, err:%v", album.APP_CONFIG_FILENAME, err)
 	}
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", app.Port), album.Album{}))
 }
