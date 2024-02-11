@@ -5,7 +5,7 @@ SCRIPT_DIRECTORY_PATH=$(dirname "${0}")
 
 cd "${SCRIPT_DIRECTORY_PATH}"
 
-version=latest
+version=1
 
 IMAGE=${1-jddwoody/album:$version}
 CONTAINER=${2-album}
@@ -15,8 +15,8 @@ ${COMMAND} stop ${CONTAINER} || true && ${COMMAND} rm -f ${CONTAINER} || true
 ${COMMAND} run \
     --hostname ${CONTAINER} \
     --name ${CONTAINER} \
-    -p9000:9000 \
-    -v /home/jdw/testalbum:/albums \
+    -p8000:9000 \
+    -v /albums:/albums \
     -d \
     ${IMAGE}
 
