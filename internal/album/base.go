@@ -13,34 +13,45 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/alitto/pond"
 )
 
 const (
-	DEFAULT_ASPECT  = 0.2
-	CONFIG_FILENAME = "config.yaml"
+	DEFAULT_ASPECT         = 0.2
+	APP_CONFIG_FILENAME    = "appconfig.yaml"
+	ALBUMS_CONFIG_FILENAME = "albumsconfig.yaml"
+	CONFIG_FILENAME        = "config.yaml"
 )
 
-type App struct {
-	Port      int               `yaml:"port"`
-	BodyArgs  string            `yaml:"bodyArgs"`
-	Default   Config            `yaml:"default"`
-	Albums    map[string]Config `yaml:"albums"`
-	Timestamp time.Time         `yaml:"timestamp"`
+type AppConfig struct {
+	Port      int    `yaml:"port"`
+	AlbumsDir string `yaml:"albumsDir"`
 }
 
-// Implement aspect ratio
+type AlbumsConfig struct {
+	BodyArgs string                 `yaml:"bodyArgs"`
+	Default  Config                 `yaml:"default"`
+	Albums   map[string]AlbumConfig `yaml:"albums"`
+}
+
+type AlbumConfig struct {
+	AlbumTitle string `yaml:"albumTitle"`
+	AlbumDir   string `yaml:"albumDir"`
+	ThumbDir   string `yaml:"thumbDir"`
+	Config     Config `yaml:"config"`
+}
 
 type Config struct {
-	AlbumTitle          string `yaml:"albumTitle"`
-	AlbumDir            string `yaml:"albumDir"`
 	BodyArgs            string `yaml:"bodyArgs"`
+	VideoThumbnailSize  string `yaml:"videoThumbnailSize"`
 	ThumbnailUse        string `yaml:"thumbnailUse"`
 	ThumbnailWidth      int    `yaml:"thumbnailWidth"`
 	ThumbnailAspect     string `yaml:"thumbnailAspect"`
-	ThumbDir            string `yaml:"thumbDir"`
 	DefaultBrowserWidth int    `yaml:"defaultBrowserWidth"`
 	SlideShowDelay      int    `yaml:"slideShowDelay"`
 	NumberOfColumns     int    `yaml:"numberOfColumns"`
@@ -53,16 +64,22 @@ type Config struct {
 }
 
 type TemplateSource struct {
-	App             *App
+	AppConfig       *AppConfig
+	AlbumsConfig    *AlbumsConfig
+	AlbumConfig     AlbumConfig
 	Current         Config
 	Root            string
 	BasePath        string
 	PathInfo        string
+	DirInfo         string
 	NumberOfColumns int
-	Files           []os.FileInfo
-	Dirs            []os.FileInfo
+	Files           []os.DirEntry
+	Dirs            []os.DirEntry
+	ImageCount      int
+	FullTitle       string
 	PageTitle       string
 	ActualPath      string
+	Mp4Path         string
 	BaseFilename    string
 	FileIndex       int
 	PrevSeven       string
@@ -90,10 +107,95 @@ var (
 		"med": "800x600_",
 		"lg":  "1024x768_",
 	}
+
+	filetypeMap = map[string][]string{
+		"images":   {"jpg", "jpeg", "gif"},
+		"videos":   {"avi", "mpeg"},
+		"htmlview": {"ogg", "webm", "mp4", "mov"},
+	}
+
+	pool = pond.New(3, 750)
+
+	workingMap = make(map[string]bool)
 )
 
-func (a App) String() string {
-	return fmt.Sprintf(`App:{Port:%d,BodyArgs:%s,Default:%s,Albums:%v,Timestamp:%v`, a.Port, a.BodyArgs, a.Default, a.Albums, a.Timestamp)
+func GetImageFiles(files []os.DirEntry) []os.DirEntry {
+	var imageFiles []os.DirEntry
+	for _, file := range files {
+		if IsImageFile(file.Name()) {
+			imageFiles = append(imageFiles, file)
+		}
+	}
+	return imageFiles
+}
+
+func IsViewableFile(filename string) bool {
+	return IsImageFile(filename) || IsVideoFile(filename)
+}
+
+func IsImageFile(filename string) bool {
+	asLower := strings.ToLower(filename)
+	for _, filetype := range filetypeMap["images"] {
+		if strings.HasSuffix(asLower, filetype) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsVideoFile(filename string) bool {
+	return CanHtmlPlay(filename) || VideoNeedsConversion(filename)
+}
+
+func VideoNeedsConversion(filename string) bool {
+	asLower := strings.ToLower(filename)
+	for _, filetype := range filetypeMap["videos"] {
+		if strings.HasSuffix(asLower, filetype) {
+			return true
+		}
+	}
+	return false
+}
+
+func CanHtmlPlay(filename string) bool {
+	asLower := strings.ToLower(filename)
+	for _, filetype := range filetypeMap["htmlview"] {
+		if strings.HasSuffix(asLower, filetype) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsFfmpegAvailable() bool {
+	_, err := exec.LookPath("ffmpeg")
+	return err == nil
+}
+
+func GenerateVideoThumbnail(inFilename, size, outFilename string) error {
+	cmd := exec.Command("ffmpeg", "-i", inFilename, "-frames:v", "1", "-s", size, outFilename)
+	return cmd.Run()
+}
+
+func ConvertVideoFile(inFilename, outFilename string) error {
+	cmd := exec.Command("ffmpeg", "-i", inFilename, outFilename)
+	return cmd.Run()
+}
+
+func ChangeExtension(filename, ext string) string {
+	return fmt.Sprintf("%s.%s", strings.TrimSuffix(filename, filepath.Ext(filename)), ext)
+}
+
+func (a AppConfig) String() string {
+	return fmt.Sprintf("AppConfig:{Port:%d,AlbumsDir:%s}", a.Port, a.AlbumsDir)
+}
+
+func (a AlbumsConfig) String() string {
+	return fmt.Sprintf("AlbumsConfig:{Default:%v,Albums:%v}", a.Default, a.Albums)
+}
+
+func (a AlbumConfig) String() string {
+	return fmt.Sprintf("AlbumConfig:{AlbumTitle:%s,AlbumDir:%s,ThumbDir:%s,Config:%v},", a.AlbumTitle, a.AlbumDir, a.ThumbDir, a.Config)
 }
 
 func (c Config) GetThumbnailUse() string {
@@ -108,6 +210,13 @@ func (c Config) GetThumbnailWidth() int {
 		return 100
 	}
 	return c.ThumbnailWidth
+}
+
+func (c Config) GetVideoThumbnailSize() string {
+	if c.VideoThumbnailSize == "" {
+		return "200x150"
+	}
+	return c.VideoThumbnailSize
 }
 
 func (c Config) GetDefaultBrowserWidth() int {
@@ -147,14 +256,13 @@ func (c Config) GetThumbnailAspect() float64 {
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf(`Config:{AlbumTitle:"%s",AlbumDir:"%s",BodyArgs:%s,ThumbnailUse:"%s",ThumbnailWidth:%d,ThumbnailAspect:"%s",ThumbDir:"%s",SlideShowDelay:%d,NumberOfColumns:%d,EditMode:%v,AllowFinalResize:%v,ReverseDirs:%v,ReversePics:%v`,
-		c.AlbumTitle, c.AlbumDir, c.BodyArgs, c.ThumbnailUse, c.ThumbnailWidth, c.ThumbnailAspect, c.ThumbDir,
-		c.SlideShowDelay, c.NumberOfColumns, c.EditMode, c.AllowFinalResize, c.ReverseDirs, c.ReversePics)
+	return fmt.Sprintf("Config:{BodyArgs:%s,VideoThumbnailSize:%s,ThumbnailUse:%s,ThumbnailWidth:%d,ThumbnailAspect:%s,SlideShowDelay:%d,NumberOfColumns:%d,EditMode:%v,AllowFinalResize:%v,ReverseDirs:%v,ReversePics:%v}",
+		c.BodyArgs, c.ThumbnailUse, c.VideoThumbnailSize, c.ThumbnailWidth, c.ThumbnailAspect, c.SlideShowDelay, c.NumberOfColumns, c.EditMode, c.AllowFinalResize, c.ReverseDirs, c.ReversePics)
 }
 
 func (t TemplateSource) String() string {
-	return fmt.Sprintf(`TemplateSource:{App:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,Files:%v,Dirs:%v,PageTitle:%s,ActualPath:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v`,
-		t.App, t.Current, t.Root, t.BasePath, t.PathInfo, t.Files, t.Dirs, t.PageTitle, t.ActualPath, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
+	return fmt.Sprintf(`TemplateSource:{AppConfig:%v,AlbumConfig:%v,AlbumConfig:%v,Current:%v,Root:%s,BasePath:%s,PathInfo:%s,DirInfo:%s,Files:%v,Dirs:%v,ImageCount:%v,FullTitle:%s, PageTitle:%s,ActualPath:%s,Mp4Path:%s,BaseFilename:%s,FileIndex:%d,PrevSeven:%s,NextSeven:%s,CaptionHtml:%s,CaptionMap:%v}`,
+		t.AppConfig, t.AlbumConfig, t.AlbumConfig, t.Current, t.Root, t.BasePath, t.PathInfo, t.DirInfo, t.Files, t.Dirs, t.ImageCount, t.FullTitle, t.PageTitle, t.ActualPath, t.Mp4Path, t.BaseFilename, t.FileIndex, t.PrevSeven, t.NextSeven, t.CaptionHtml, t.CaptionMap)
 }
 
 func (a AlbumTitle) String() string {
@@ -185,15 +293,12 @@ func NewCaptionFile(f io.Reader) *CaptionFile {
 
 // merges any non-default values in b into a
 func Merge(a, b *Config) {
-	if b.AlbumTitle != "" {
-		a.AlbumTitle = b.AlbumTitle
-	}
-	if b.AlbumDir != "" {
-		a.AlbumDir = b.AlbumDir
-	}
-
 	if b.BodyArgs != "" {
 		a.BodyArgs = b.BodyArgs
+	}
+
+	if b.VideoThumbnailSize != "" {
+		a.VideoThumbnailSize = b.VideoThumbnailSize
 	}
 
 	if b.ThumbnailUse != "" {
@@ -206,10 +311,6 @@ func Merge(a, b *Config) {
 
 	if b.ThumbnailAspect != "" {
 		a.ThumbnailAspect = b.ThumbnailAspect
-	}
-
-	if b.ThumbDir != "" {
-		a.ThumbDir = b.ThumbDir
 	}
 
 	if b.SlideShowDelay > 0 {

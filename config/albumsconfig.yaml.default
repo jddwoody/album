@@ -1,9 +1,9 @@
-port: 8000
 bodyArgs: bgcolor="#003939" rgb="#000000" text="#FFFFFF" link="#00ff00" vlink="#83BCBC"
 default:
     bodyArgs: bgcolor="#003939" rgb="#000000" text="#FFFFFF" link="#00ff00" vlink="#83BCBC"
     thumbnailUse: width
-    thumbnailWidth: 200
+    videoThumbnailSize: 320x240
+    thumbnailWidth: 320
     thumbnailAspect: 1/5
     defaultBrowserWidth: 1024
     slideShowDelay: 10
@@ -13,7 +13,7 @@ default:
     reverseDirs: false
     reversePics: false
 albums:
-  test:
+  testalbum:
     albumTitle: Test Album
-    albumDir: "/tools/albums/albums_loc"
-    thumbDir: "/tools/albums/thumbs"
+    albumDir: "/test/source"
+    thumbDir: "/test/thumbs"
