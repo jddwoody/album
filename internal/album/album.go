@@ -112,7 +112,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	tmplSource.Current = albumsConfig.Default
 	Merge(&tmplSource.Current, &albumConfig.Config)
 	baseDir := filepath.Join(appConfig.AlbumsDir, tmplSource.AlbumConfig.AlbumDir)
-	albumPathInfo := fmt.Sprintf("%s/%s", baseDir, tmplSource.PathInfo)
+	albumPathInfo := filepath.Join(baseDir, tmplSource.PathInfo)
 
 	stat, err := os.Stat(albumPathInfo)
 	if err != nil {
@@ -215,11 +215,13 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		} else {
 			tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, ChangeExtension(tmplSource.PathInfo, "webm"))
 			tmplSource.Mp4Path = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, ChangeExtension(tmplSource.PathInfo, "mp4"))
-			mp4ActualFile := fmt.Sprintf("%s/%s", tmplSource.AlbumConfig.ThumbDir, ChangeExtension(tmplSource.PathInfo, "mp4"))
+			mp4RelativeFile := filepath.Join(tmplSource.AlbumConfig.ThumbDir, ChangeExtension(tmplSource.PathInfo, "mp4"))
+			mp4ActualFile := filepath.Join(appConfig.AlbumsDir, mp4RelativeFile)
 			fmt.Printf("mp4ActualFile:%s\n", mp4ActualFile)
 			if _, err := os.Stat(mp4ActualFile); errors.Is(err, os.ErrNotExist) {
-				fmt.Printf("Need to generate mp4:%s\n", mp4ActualFile)
-				ConvertVideoFile(fmt.Sprintf("%s/%s", tmplSource.AlbumConfig.AlbumDir, tmplSource.PathInfo), mp4ActualFile)
+				source := filepath.Join(appConfig.AlbumsDir, tmplSource.ActualPath)
+				fmt.Printf("Need to generate mp4:%s from %s\n", mp4ActualFile, source)
+				ConvertVideoFile(source, mp4ActualFile)
 			}
 		}
 		tmpl = template.Must(template.New("base").Parse(pictureDirHeader(false) + fmt.Sprintf(
