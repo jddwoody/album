@@ -5,7 +5,7 @@ SCRIPT_DIRECTORY_PATH=$(dirname "${0}")
 
 cd "${SCRIPT_DIRECTORY_PATH}"
 
-version=1
+version=3
 
 IMAGE=${1-jddwoody/album:$version}
 CONTAINER=${2-album}
