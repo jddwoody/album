@@ -11,12 +11,12 @@ IMAGE=${1-jddwoody/album:$version}
 CONTAINER=${2-album}
 COMMAND="docker"
 
-${COMMAND} stop ${CONTAINER} || true && ${COMMAND} rm -f ${CONTAINER} || true
+${COMMAND} stop "${CONTAINER}" || true && ${COMMAND} rm -f "${CONTAINER}" || true
 ${COMMAND} run \
-    --hostname ${CONTAINER} \
-    --name ${CONTAINER} \
+    --hostname "${CONTAINER}" \
+    --name "${CONTAINER}" \
     -p8000:9000 \
     -v /albums:/albums \
     -d \
-    ${IMAGE}
+    "${IMAGE}"
 

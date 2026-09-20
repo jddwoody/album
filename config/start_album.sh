@@ -1,8 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 SCRIPT_NAME=$(basename "${0}")
 SCRIPT_DIRECTORY_PATH=$(dirname "${0}")
 
 cd "${SCRIPT_DIRECTORY_PATH}"
 
-./album 2>&1 > logs/albums.log
+printf 'album container user: %s (uid=%s gid=%s)\n' "$(id -un)" "$(id -u)" "$(id -g)"
+
+exec ./album

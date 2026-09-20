@@ -10,13 +10,17 @@ package album
 
 import (
 	"bufio"
+	"context"
 	"fmt"
+	"html/template"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/alitto/pond"
 )
@@ -82,9 +86,9 @@ type TemplateSource struct {
 	Mp4Path         string
 	BaseFilename    string
 	FileIndex       int
-	PrevSeven       string
-	NextSeven       string
-	CaptionHtml     string
+	PrevSeven       template.HTML
+	NextSeven       template.HTML
+	CaptionHtml     template.HTML
 	CaptionMap      map[string]string
 }
 
@@ -117,6 +121,7 @@ var (
 	pool = pond.New(3, 750)
 
 	workingMap = make(map[string]bool)
+	workingMu  sync.Mutex
 )
 
 func GetImageFiles(files []os.DirEntry) []os.DirEntry {
@@ -134,9 +139,9 @@ func IsViewableFile(filename string) bool {
 }
 
 func IsImageFile(filename string) bool {
-	asLower := strings.ToLower(filename)
+	extension := strings.ToLower(filepath.Ext(filename))
 	for _, filetype := range filetypeMap["images"] {
-		if strings.HasSuffix(asLower, filetype) {
+		if extension == "."+filetype {
 			return true
 		}
 	}
@@ -148,9 +153,9 @@ func IsVideoFile(filename string) bool {
 }
 
 func VideoNeedsConversion(filename string) bool {
-	asLower := strings.ToLower(filename)
+	extension := strings.ToLower(filepath.Ext(filename))
 	for _, filetype := range filetypeMap["videos"] {
-		if strings.HasSuffix(asLower, filetype) {
+		if extension == "."+filetype {
 			return true
 		}
 	}
@@ -158,9 +163,9 @@ func VideoNeedsConversion(filename string) bool {
 }
 
 func CanHtmlPlay(filename string) bool {
-	asLower := strings.ToLower(filename)
+	extension := strings.ToLower(filepath.Ext(filename))
 	for _, filetype := range filetypeMap["htmlview"] {
-		if strings.HasSuffix(asLower, filetype) {
+		if extension == "."+filetype {
 			return true
 		}
 	}
@@ -173,13 +178,40 @@ func IsFfmpegAvailable() bool {
 }
 
 func GenerateVideoThumbnail(inFilename, size, outFilename string) error {
-	cmd := exec.Command("ffmpeg", "-i", inFilename, "-frames:v", "1", "-s", size, outFilename)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-i", inFilename, "-frames:v", "1", "-s", size, outFilename)
 	return cmd.Run()
 }
 
 func ConvertVideoFile(inFilename, outFilename string) error {
-	cmd := exec.Command("ffmpeg", "-i", inFilename, outFilename)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-i", inFilename, outFilename)
 	return cmd.Run()
+}
+
+func safeJoin(root, relative string) (string, error) {
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+
+	relative = filepath.FromSlash(relative)
+	if filepath.IsAbs(relative) {
+		return "", fmt.Errorf("path %q is absolute", relative)
+	}
+
+	joined := filepath.Join(rootAbs, relative)
+	rel, err := filepath.Rel(rootAbs, joined)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q escapes root", relative)
+	}
+
+	return joined, nil
 }
 
 func ChangeExtension(filename, ext string) string {
@@ -194,6 +226,10 @@ func (a AlbumsConfig) String() string {
 	return fmt.Sprintf("AlbumsConfig:{Default:%v,Albums:%v}", a.Default, a.Albums)
 }
 
+func (a AlbumsConfig) SafeBodyArgs() template.HTMLAttr {
+	return template.HTMLAttr(a.BodyArgs)
+}
+
 func (a AlbumConfig) String() string {
 	return fmt.Sprintf("AlbumConfig:{AlbumTitle:%s,AlbumDir:%s,ThumbDir:%s,Config:%v},", a.AlbumTitle, a.AlbumDir, a.ThumbDir, a.Config)
 }
@@ -203,6 +239,10 @@ func (c Config) GetThumbnailUse() string {
 		return "width"
 	}
 	return c.ThumbnailUse
+}
+
+func (c Config) SafeBodyArgs() template.HTMLAttr {
+	return template.HTMLAttr(c.BodyArgs)
 }
 
 func (c Config) GetThumbnailWidth() int {

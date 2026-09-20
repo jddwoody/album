@@ -11,6 +11,7 @@ package album
 import (
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"path"
@@ -18,16 +19,22 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"text/template"
 
 	"github.com/disintegration/imaging"
 	"gopkg.in/yaml.v2"
 )
 
 func (a Album) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; base-uri 'none'")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+
 	switch req.Method {
 	case "GET":
 		a.handleGet(w, req)
+	default:
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -55,7 +62,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		// It should always be at least 2, so show page with available albums
 		tmpl = template.Must(template.New("base").Parse(`<HTML>
   <HEADER><TITLE>Available Albums</TITLE></HEADER>
-  <BODY {{ .BodyArgs }}>
+	<BODY {{ .SafeBodyArgs }}>
     <H3>Available Albums</H3>
 	{{ range .SortedAlbumTitles }}
 	<a href="/{{ .Key }}/albums/">{{ .Title }}</a><br>
@@ -65,8 +72,9 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 `))
 
 		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		tmpl.Execute(w, albumsConfig)
+		if err := tmpl.Execute(w, albumsConfig); err != nil {
+			fmt.Printf("Error rendering album index: %v\n", err)
+		}
 		return
 	}
 
@@ -88,8 +96,9 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		tmpl.Execute(w, tmplSource)
+		if err := tmpl.Execute(w, tmplSource); err != nil {
+			fmt.Printf("Error rendering album page: %v\n", err)
+		}
 	}()
 
 	// Paths[0] should match an album id, Paths[1] should be either albums or thumbs
@@ -112,7 +121,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	tmplSource.Current = albumsConfig.Default
 	Merge(&tmplSource.Current, &albumConfig.Config)
 	baseDir := filepath.Join(appConfig.AlbumsDir, tmplSource.AlbumConfig.AlbumDir)
-	albumPathInfo := filepath.Join(baseDir, tmplSource.PathInfo)
+	albumPathInfo, err := safeJoin(baseDir, tmplSource.PathInfo)
+	if err != nil {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
 
 	stat, err := os.Stat(albumPathInfo)
 	if err != nil {
@@ -120,10 +133,10 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		// if the filename starts with 640x480_, 800x600_ or 1024x768_, set imgLink to
 		// thumbs and let the normal handler take care of it
 		if strings.HasPrefix(filename, "640x480_") || strings.HasPrefix(filename, "800x600_") || strings.HasPrefix(filename, "1024x768_") {
-			tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, tmplSource.PathInfo)
-			tmplSource.BaseFilename = filepath.Base(cleanTn(tmplSource.ActualPath))
+			a.handleThumbnail(w, req, appConfig, albumsConfig, paths[0], paths[2])
+			return
 		} else {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			http.Error(w, "file not found", http.StatusNotFound)
 			return
 		}
 	}
@@ -131,7 +144,11 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	playVideo := req.URL.Query().Get("playvideo")
 	if playVideo != "" && stat.Mode().IsRegular() {
 		tmplSource.BaseFilename = filepath.Base(tmplSource.PathInfo)
-		videoDir := fmt.Sprintf("%s/%s", baseDir, filepath.Dir(tmplSource.PathInfo))
+		videoDir, err := safeJoin(baseDir, filepath.Dir(tmplSource.PathInfo))
+		if err != nil {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
 		dirEntries, err := os.ReadDir(videoDir)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -162,8 +179,8 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 					move = lastIndex - tmplSource.FileIndex
 				}
 				prevName := tmplSource.Files[tmplSource.FileIndex-less-move].Name()
-				tmplSource.PrevSeven = fmt.Sprintf(`<TD ALIGN="left"><A HREF="%s?playvideo=1")>&lt;Prev %d&lt;</A></TD>`,
-					fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), prevName), less)
+				tmplSource.PrevSeven = template.HTML(fmt.Sprintf(`<TD ALIGN="left"><A HREF="%s?playvideo=1">&lt;Prev %d&lt;</A></TD>`,
+					escapeTemplateHTML(fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), prevName)), less))
 			}
 
 			if tmplSource.FileIndex < lastIndex-3 {
@@ -177,8 +194,8 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				}
 				nextName := tmplSource.Files[tmplSource.FileIndex+more+move].Name()
 				currentBase := filepath.Base(tmplSource.Root)
-				tmplSource.NextSeven = fmt.Sprintf(`<TD ALIGN="right"><A HREF="%s?playvideo=1">&gt;Next %d&gt;</A></TD>`,
-					fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), fixNextName(currentBase, nextName)), more)
+				tmplSource.NextSeven = template.HTML(fmt.Sprintf(`<TD ALIGN="right"><A HREF="%s?playvideo=1">&gt;Next %d&gt;</A></TD>`,
+					escapeTemplateHTML(fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), fixNextName(currentBase, nextName))), more))
 			}
 		}
 
@@ -207,7 +224,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				extraTd = ` bgcolor="blue"`
 			}
 
-			thumbnailLinks += fmt.Sprintf(`<TD%s><A HREF="%s?playvideo=1"><IMG SRC="%s" height="60" title="Click to Play Video"></A></TD>`, extraTd, fixNextName(currentBase, filename), tnImgSrc)
+			thumbnailLinks += fmt.Sprintf(`<TD%s><A HREF="%s?playvideo=1"><IMG SRC="%s" height="60" title="Click to Play Video"></A></TD>`, extraTd, escapeTemplateHTML(fixNextName(currentBase, filename)), escapeTemplateHTML(tnImgSrc))
 		}
 
 		if CanHtmlPlay(tmplSource.BaseFilename) {
@@ -215,13 +232,24 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 		} else {
 			tmplSource.ActualPath = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, ChangeExtension(tmplSource.PathInfo, "webm"))
 			tmplSource.Mp4Path = fmt.Sprintf("/%s/thumbs/%s", tmplSource.BasePath, ChangeExtension(tmplSource.PathInfo, "mp4"))
-			mp4RelativeFile := filepath.Join(tmplSource.AlbumConfig.ThumbDir, ChangeExtension(tmplSource.PathInfo, "mp4"))
-			mp4ActualFile := filepath.Join(appConfig.AlbumsDir, mp4RelativeFile)
+			thumbDir := filepath.Join(appConfig.AlbumsDir, tmplSource.AlbumConfig.ThumbDir)
+			mp4ActualFile, err := safeJoin(thumbDir, ChangeExtension(tmplSource.PathInfo, "mp4"))
+			if err != nil {
+				http.Error(w, "invalid path", http.StatusBadRequest)
+				return
+			}
 			fmt.Printf("mp4ActualFile:%s\n", mp4ActualFile)
 			if _, err := os.Stat(mp4ActualFile); errors.Is(err, os.ErrNotExist) {
-				source := filepath.Join(appConfig.AlbumsDir, tmplSource.ActualPath)
+				source := albumPathInfo
 				fmt.Printf("Need to generate mp4:%s from %s\n", mp4ActualFile, source)
-				ConvertVideoFile(source, mp4ActualFile)
+				if err := os.MkdirAll(filepath.Dir(mp4ActualFile), 0755); err != nil {
+					http.Error(w, "unable to create thumbnail directory", http.StatusInternalServerError)
+					return
+				}
+				if err := ConvertVideoFile(source, mp4ActualFile); err != nil {
+					http.Error(w, "unable to convert video", http.StatusInternalServerError)
+					return
+				}
 			}
 		}
 		tmpl = template.Must(template.New("base").Parse(pictureDirHeader(false) + fmt.Sprintf(
@@ -262,7 +290,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 	dirEntries, err := os.ReadDir(albumDir)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "unable to read album directory", http.StatusInternalServerError)
 		return
 	}
 
@@ -274,19 +302,19 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 			}
 		} else {
 			if dirEntry.Name() == "caption.txt" {
-				in, err := os.Open(fmt.Sprintf("%s/%s", albumDir, dirEntry.Name()))
+				in, err := os.Open(filepath.Join(albumDir, dirEntry.Name()))
 				if err == nil {
-					defer in.Close()
 					captionFile = NewCaptionFile(in)
+					_ = in.Close()
 				}
 			} else if dirEntry.Name() == "config.yaml" {
 				fmt.Println("Found config.yaml")
-				in, err := os.Open(fmt.Sprintf("%s/%s", albumDir, dirEntry.Name()))
+				in, err := os.Open(filepath.Join(albumDir, dirEntry.Name()))
 				if err == nil {
-					defer in.Close()
 					decoder := yaml.NewDecoder(in)
 					var dirConfig Config
 					err = decoder.Decode(&dirConfig)
+					_ = in.Close()
 					if err == nil {
 						fmt.Printf("new dirconfig: %v\n", dirConfig)
 						Merge(&tmplSource.Current, &dirConfig)
@@ -306,15 +334,29 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 					// A video file that isn't html viewable needs to be converted
 					if VideoNeedsConversion(dirEntry.Name()) {
 						originalFilename := fmt.Sprintf("%s/%s", albumDir, dirEntry.Name())
-						thumbActualDir := fmt.Sprintf("%s/%s", filepath.Join(appConfig.AlbumsDir, tmplSource.AlbumConfig.ThumbDir), tmplSource.PathInfo)
-						convertedFilename := fmt.Sprintf("%s/%s", thumbActualDir, ChangeExtension(dirEntry.Name(), "webm"))
+						thumbRoot := filepath.Join(appConfig.AlbumsDir, tmplSource.AlbumConfig.ThumbDir)
+						convertedFilename, err := safeJoin(thumbRoot, filepath.Join(tmplSource.PathInfo, ChangeExtension(dirEntry.Name(), "webm")))
+						if err != nil {
+							continue
+						}
 						if _, err := os.Stat(convertedFilename); errors.Is(err, os.ErrNotExist) {
-							if !workingMap[originalFilename] {
-								fmt.Printf("Converting %s to %s\n", originalFilename, convertedFilename)
+							workingMu.Lock()
+							alreadyWorking := workingMap[originalFilename]
+							if !alreadyWorking {
 								workingMap[originalFilename] = true
+							}
+							workingMu.Unlock()
+							if !alreadyWorking {
+								fmt.Printf("Converting %s to %s\n", originalFilename, convertedFilename)
 								pool.Submit(func() {
-									ConvertVideoFile(originalFilename, convertedFilename)
-									//delete(workingMap, originalFilename)
+									defer func() {
+										workingMu.Lock()
+										delete(workingMap, originalFilename)
+										workingMu.Unlock()
+									}()
+									if err := ConvertVideoFile(originalFilename, convertedFilename); err != nil {
+										fmt.Printf("Error converting %s: %v\n", originalFilename, err)
+									}
 								})
 							}
 						}
@@ -325,7 +367,7 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if captionFile != nil {
-		tmplSource.CaptionHtml = captionFile.Html
+		tmplSource.CaptionHtml = template.HTML(captionFile.Html)
 		tmplSource.CaptionMap = captionFile.CaptionMap
 	}
 
@@ -458,8 +500,8 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 					prevName = "1024x768_" + prevName
 				}
 
-				tmplSource.PrevSeven = fmt.Sprintf(`<TD ALIGN="left"><A HREF="%s")>&lt;Prev %d&lt;</A></TD>`,
-					fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), prevName), less)
+				tmplSource.PrevSeven = template.HTML(fmt.Sprintf(`<TD ALIGN="left"><A HREF="%s">&lt;Prev %d&lt;</A></TD>`,
+					escapeTemplateHTML(fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), prevName)), less))
 			}
 
 			if tmplSource.FileIndex < lastIndex-3 {
@@ -473,8 +515,8 @@ func (a Album) handleGet(w http.ResponseWriter, req *http.Request) {
 				}
 				nextName := imageFiles[tmplSource.FileIndex+more+move].Name()
 				currentBase := filepath.Base(tmplSource.Root)
-				tmplSource.NextSeven = fmt.Sprintf(`<TD ALIGN="right"><A HREF="%s">&gt;Next %d&gt;</A></TD>`,
-					fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), fixNextName(currentBase, nextName)), more)
+				tmplSource.NextSeven = template.HTML(fmt.Sprintf(`<TD ALIGN="right"><A HREF="%s">&gt;Next %d&gt;</A></TD>`,
+					escapeTemplateHTML(fmt.Sprintf("%s/%s", filepath.Dir(tmplSource.Root), fixNextName(currentBase, nextName))), more))
 			}
 		}
 
@@ -528,7 +570,7 @@ func (a Album) generateDirs() *template.Template {
 	return template.Must(template.New("base").Parse(`
 	<HTML>
 		<HEADER><TITLE>{{ .AlbumConfig.AlbumTitle }}</TITLE></HEADER>
-		<BODY {{ .AlbumsConfig.BodyArgs }}>
+		<BODY {{ .AlbumsConfig.SafeBodyArgs }}>
 			<H3>{{ .AlbumConfig.AlbumTitle }}</H3>
 			{{ .FullTitle }}
 			{{ range .Dirs }}
@@ -551,32 +593,28 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, appConf
 
 	Merge(&config, &albumConfig.Config)
 	thumbDir := filepath.Join(appConfig.AlbumsDir, albumConfig.ThumbDir)
-	fullFilename := fmt.Sprintf("%s/%s", thumbDir, pathInfo)
-	_, err := os.Stat(fullFilename)
+	fullFilename, err := safeJoin(thumbDir, pathInfo)
+	if err != nil {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	_, err = os.Stat(fullFilename)
 
 	// err just means we need to create it
-	if err != nil {
-		currentPath := ""
-		// First make sure the directories are all there
-		paths := strings.Split(fullFilename, "/")
-		for idx, path := range paths {
-			if idx == 0 || idx == len(paths)-1 {
-				continue
-			}
-
-			currentPath += "/" + path
-			_, err = os.Stat(currentPath)
-			if err != nil {
-				err := os.Mkdir(currentPath, 0775)
-				if err != nil {
-					fmt.Printf("Error creating directory %s:%v\n", currentPath, err)
-				}
-			}
+	if errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(filepath.Dir(fullFilename), 0755); err != nil {
+			http.Error(w, "unable to create thumbnail directory", http.StatusInternalServerError)
+			return
 		}
 
 		fullAlbumDir := filepath.Join(appConfig.AlbumsDir, albumConfig.AlbumDir)
+		sourceFilename, err := safeJoin(fullAlbumDir, cleanTn(pathInfo))
+		if err != nil {
+			http.Error(w, "invalid source path", http.StatusBadRequest)
+			return
+		}
 		if IsImageFile(pathInfo) {
-			img, err := imaging.Open(fmt.Sprintf("%s/%s", fullAlbumDir, cleanTn(pathInfo)), imaging.AutoOrientation(true))
+			img, err := imaging.Open(sourceFilename, imaging.AutoOrientation(true))
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -592,12 +630,20 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, appConf
 				width = 1024
 			}
 			dstImage := imaging.Resize(img, width, 0, imaging.Box)
-			imaging.Save(dstImage, fullFilename)
+			if err := imaging.Save(dstImage, fullFilename); err != nil {
+				http.Error(w, "unable to save thumbnail", http.StatusInternalServerError)
+				return
+			}
 		} else {
 			// Must be video, need to figure out the original filename and save a frame
 			clean := cleanTn(pathInfo)
 			prefix := strings.TrimSuffix(clean, filepath.Ext(clean))
-			sourceGlob := fmt.Sprintf("%s/%s*", fullAlbumDir, prefix)
+			sourcePrefix, err := safeJoin(fullAlbumDir, prefix)
+			if err != nil {
+				http.Error(w, "invalid source path", http.StatusBadRequest)
+				return
+			}
+			sourceGlob := sourcePrefix + "*"
 			glob, err := filepath.Glob(sourceGlob)
 			if err != nil {
 				fmt.Printf("Glob error using %s, err: %s\n", prefix, err)
@@ -615,6 +661,9 @@ func (a Album) handleThumbnail(w http.ResponseWriter, req *http.Request, appConf
 				return
 			}
 		}
+	} else if err != nil {
+		http.Error(w, "unable to inspect thumbnail", http.StatusInternalServerError)
+		return
 	}
 
 	http.ServeFile(w, req, fullFilename)
@@ -647,7 +696,7 @@ func (a AlbumsConfig) SortedAlbumTitles() []AlbumTitle {
 }
 
 func (t TemplateSource) NeedNewRow(index int) bool {
-	return index > 0 && index%t.NumberOfColumns == 0
+	return t.NumberOfColumns > 0 && index > 0 && index%t.NumberOfColumns == 0
 }
 
 func (t TemplateSource) IsImageFile(filename string) bool {
@@ -662,20 +711,27 @@ func (t TemplateSource) AsPngFilename(filename string) string {
 	return ChangeExtension(filename, "png")
 }
 
-func (t TemplateSource) HandleDirs(f os.DirEntry, subdir string, depth int) string {
+func (t TemplateSource) HandleDirs(f os.DirEntry, subdir string, depth int) template.HTML {
+	if depth >= 64 {
+		return template.HTML("")
+	}
 	// Check directory to see if there are sub-directories
 	newSubDir := f.Name()
 	if subdir != "" {
 		newSubDir = subdir + "/" + f.Name()
 	}
 	dir := filepath.Join(t.AppConfig.AlbumsDir, t.AlbumConfig.AlbumDir)
+	var err error
 	if t.PathInfo == "" {
-		dir += "/" + newSubDir
+		dir, err = safeJoin(dir, newSubDir)
 	} else {
-		dir += "/" + t.PathInfo + "/" + newSubDir
+		dir, err = safeJoin(dir, filepath.Join(t.PathInfo, newSubDir))
+	}
+	if err != nil {
+		return template.HTML("")
 	}
 
-	children := ""
+	children := template.HTML("")
 	dirEntries, err := os.ReadDir(dir)
 	if err == nil {
 		if t.Current.ReverseDirs {
@@ -699,8 +755,8 @@ func (t TemplateSource) HandleDirs(f os.DirEntry, subdir string, depth int) stri
 
 	}
 
-	return fmt.Sprintf(`<dt><a href="%s%s/">%s</a></dt>`,
-		t.Root, newSubDir, beautify(f.Name())) + children
+	return template.HTML(fmt.Sprintf(`<dt><a href="%s%s/">%s</a></dt>`,
+		escapeTemplateHTML(t.Root), escapeTemplateHTML(newSubDir), escapeTemplateHTML(beautify(f.Name()))) + string(children))
 }
 
 func (t TemplateSource) MakePicTitle(s string) string {
@@ -749,12 +805,16 @@ func pictureDirHeader(includeExtraTitle bool) string {
 	return `
 	<HTML>
 		<HEADER><TITLE>{{ .PageTitle }}</TITLE></HEADER>
-		<BODY {{ .Current.BodyArgs }}>` + extraTitle +
+		<BODY {{ .Current.SafeBodyArgs }}>` + extraTitle +
 		`<HR />
 		<CENTER>
 		  <div style="overflow: auto; height: calc(100vh - ` + height + `px)">
 		  {{ .CaptionHtml }}
 		  <TABLE BORDER={{ .Current.OutsideTableBorder }}>	`
+}
+
+func escapeTemplateHTML(value string) string {
+	return strings.NewReplacer("{", "&#123;", "}", "&#125;").Replace(template.HTMLEscapeString(value))
 }
 
 func pictureDirFooter() string {

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/jddwoody/album/internal/album"
 )
@@ -25,5 +26,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config file %s, err:%v", album.APP_CONFIG_FILENAME, err)
 	}
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", app.Port), album.Album{}))
+	server := &http.Server{
+		Addr:              fmt.Sprintf("0.0.0.0:%d", app.Port),
+		Handler:           album.Album{},
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      5 * time.Minute,
+		IdleTimeout:       60 * time.Second,
+	}
+	log.Fatal(server.ListenAndServe())
 }
