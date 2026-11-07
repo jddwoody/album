@@ -113,7 +113,7 @@ var (
 	}
 
 	filetypeMap = map[string][]string{
-		"images":   {"jpg", "jpeg", "gif"},
+		"images":   {"jpg", "jpeg", "gif", "png"},
 		"videos":   {"avi", "mpeg"},
 		"htmlview": {"ogg", "webm", "mp4", "mov"},
 	}

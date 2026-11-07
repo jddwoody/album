@@ -73,6 +73,14 @@ john5.jpg: This is <A HREF="mailto:johndoe@nowhere.com">John</A>
 	}
 }
 
+func TestIsImageFileIncludesPNG(t *testing.T) {
+	for _, filename := range []string{"Scan_0052.png", "Scan_0053.PNG"} {
+		if !IsImageFile(filename) {
+			t.Errorf("IsImageFile(%q) = false, want true", filename)
+		}
+	}
+}
+
 func TestAlbumRejectsPathTraversal(t *testing.T) {
 	workingDir := t.TempDir()
 	oldWorkingDir, err := os.Getwd()
